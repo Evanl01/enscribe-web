@@ -113,7 +113,7 @@ export default function PrivacyPolicyPage() {
           <h2>5. Data Retention and Deletion</h2>
           <ul>
             <li><strong>Audio Recordings:</strong> Securely deleted within 30 days after transcription completion unless otherwise specified by the healthcare provider</li>
-            <li><strong>Transcriptions and SOAP Notes:</strong> Retained according to the healthcare provider's specified retention policy, typically 7-10 years</li>
+            <li><strong>Transcriptions and SOAP Notes:</strong> Retained according to the healthcare provider&apos;s specified retention policy, typically 7-10 years</li>
             <li><strong>System Logs:</strong> Maintained for 12 months for security and audit purposes</li>
             <li><strong>Account Information:</strong> Deleted within 90 days of account closure</li>
           </ul>
@@ -166,7 +166,7 @@ export default function PrivacyPolicyPage() {
         </div>
 
         <div className="highlight-box">
-          <p><strong>Notice:</strong> This Privacy Policy applies specifically to EmScribe's processing of health information. Your healthcare provider may have additional privacy policies governing your medical records and care.</p>
+          <p><strong>Notice:</strong> This Privacy Policy applies specifically to EmScribe&apos;s processing of health information. Your healthcare provider may have additional privacy policies governing your medical records and care.</p>
         </div>
       </div>
     </main>

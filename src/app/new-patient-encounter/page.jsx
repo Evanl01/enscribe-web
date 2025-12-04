@@ -1,6 +1,6 @@
 "use client";
 import { redirect, useRouter, useSearchParams } from "next/navigation";
-import React, { useState, useRef, useEffect, Suspense } from "react";
+import React, { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import useWakeLock from "@/src/hooks/useWakeLock";
 import * as api from "@/public/scripts/api.js";
 import * as ui from "@/public/scripts/ui.js";
@@ -88,7 +88,7 @@ function NewPatientEncounter() {
     if (!urlRecordingPath && !loadingUrlRecording) {
       getLocalStorageRecordingFile().then(setRecordingFileMetadata);
     }
-  }, []); // Empty dependency array - runs only on mount
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Restore from localStorage on mount and enable Section 2 if any field exists
   useEffect(() => {
@@ -118,7 +118,7 @@ function NewPatientEncounter() {
     ) {
       setSoapNoteRequested(true);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle URL recording parameter
   useEffect(() => {
@@ -192,30 +192,30 @@ function NewPatientEncounter() {
     };
 
     loadRecordingFromUrl();
-  }, [urlRecordingPath]); // Remove supabase from dependency array since it's stable
+  }, [urlRecordingPath, LS_KEYS.recordingFileMetadata]); // Remove supabase from dependency array since it's stable
 
   // Save to localStorage on change
   useEffect(() => {
     localStorage.setItem(LS_KEYS.patientEncounterName, patientEncounterName);
-  }, [patientEncounterName]);
+  }, [patientEncounterName, LS_KEYS.patientEncounterName]);
   useEffect(() => {
     localStorage.setItem(LS_KEYS.transcript, transcript);
-  }, [transcript]);
+  }, [transcript, LS_KEYS.transcript]);
   useEffect(() => {
     localStorage.setItem(LS_KEYS.soapSubjective, soapSubjective);
-  }, [soapSubjective]);
+  }, [soapSubjective, LS_KEYS.soapSubjective]);
   useEffect(() => {
     localStorage.setItem(LS_KEYS.soapObjective, soapObjective);
-  }, [soapObjective]);
+  }, [soapObjective, LS_KEYS.soapObjective]);
   useEffect(() => {
     localStorage.setItem(LS_KEYS.soapAssessment, soapAssessment);
-  }, [soapAssessment]);
+  }, [soapAssessment, LS_KEYS.soapAssessment]);
   useEffect(() => {
     localStorage.setItem(LS_KEYS.soapPlan, soapPlan);
-  }, [soapPlan]);
+  }, [soapPlan, LS_KEYS.soapPlan]);
   useEffect(() => {
     localStorage.setItem(LS_KEYS.billingSuggestion, billingSuggestion);
-  }, [billingSuggestion]);
+  }, [billingSuggestion, LS_KEYS.billingSuggestion]);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingDurationRef = useRef(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -245,7 +245,7 @@ function NewPatientEncounter() {
   // subsequent flows can use cached results (helps with incognito detection)
   const isMountedRef = useRef(true);
 
-  const runStartupChecks = async () => {
+  const runStartupChecks = useCallback(async () => {
     try {
       const inc = await detectIncognitoMode();
   const storage = await getStorageQuota();
@@ -319,7 +319,7 @@ function NewPatientEncounter() {
 
       return errorResult;
     }
-  };
+  }, []);
 
   const handleAuthError = (diagnosticData, router) => {
     console.error(
@@ -379,7 +379,7 @@ function NewPatientEncounter() {
     return () => {
       isMountedRef.current = false;
     };
-  }, []);
+  }, [router, runStartupChecks]);
 
   // Recording refs
   const mediaRecorderRef = useRef(null);
