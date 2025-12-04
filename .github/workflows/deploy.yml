@@ -1,0 +1,73 @@
+name: Deploy to AWS S3 + CloudFront
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [ closed ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    # Only run on main branch pushes or merged PRs
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event.pull_request.merged == true)
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run linting
+      run: npm run lint
+
+    - name: Build Next.js static export
+      run: npm run build:prod
+      env:
+        NEXT_PUBLIC_API_URL: https://emscribe.vercel.app
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Sync files to S3
+      run: |
+        # Sync static assets with long cache
+        aws s3 sync out/ s3://enscribe-web-prod-static \
+          --delete \
+          --cache-control "public, max-age=31536000, immutable" \
+          --exclude "*.html" \
+          --exclude "*.json"
+        
+        # Sync HTML files with short cache
+        aws s3 sync out/ s3://enscribe-web-prod-static \
+          --delete \
+          --cache-control "public, max-age=0, must-revalidate" \
+          --exclude "*" \
+          --include "*.html" \
+          --include "*.json"
+
+    - name: Invalidate CloudFront
+      run: |
+        aws cloudfront create-invalidation \
+          --distribution-id ERTMP9FOP3O1Q \
+          --paths "/*"
+
+    - name: Deployment summary
+      run: |
+        echo "🚀 Deployment completed successfully!"
+        echo "📦 S3 Bucket: enscribe-web-prod-static"
+        echo "☁️ CloudFront: ERTMP9FOP3O1Q"
+        echo "🌐 Live URL: https://d2okt95q961mml.cloudfront.net"

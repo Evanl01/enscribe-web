@@ -6,22 +6,29 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:prod": "NODE_ENV=production next build",
+    "deploy:s3": "npm run build:prod && aws s3 sync out/ s3://enscribe-web-prod-static --delete --cache-control 'public, max-age=31536000, immutable' --exclude '*.html' && aws s3 sync out/ s3://enscribe-web-prod-static --delete --cache-control 'public, max-age=0, must-revalidate' --exclude '*' --include '*.html'",
+    "deploy:cloudfront": "aws cloudfront create-invalidation --distribution-id ERTMP9FOP3O1Q --paths '/*'",
+    "deploy:full": "npm run deploy:s3 && npm run deploy:cloudfront"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.86.0",
+    "docx": "^9.5.1",
+    "marked": "^17.0.1",
+    "next": "16.0.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "next": "16.0.0"
+    "styled-components": "^6.1.19",
+    "supabase": "^2.65.2",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
-    "babel-plugin-react-compiler": "1.0.0",
-    "typescript": "^5",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
     "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
+    "babel-plugin-react-compiler": "1.0.0",
+    "baseline-browser-mapping": "^2.8.32",
     "eslint": "^9",
-    "eslint-config-next": "16.0.0"
+    "eslint-config-next": "16.0.0",
+    "tailwindcss": "^4"
   }
 }
