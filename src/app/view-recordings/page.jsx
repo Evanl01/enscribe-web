@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import * as api from "@/public/scripts/api.js";
 import * as format from "@/public/scripts/format.js";
@@ -21,7 +21,7 @@ export default function ViewRecordings() {
   const [loadingRecording, setLoadingRecording] = useState(false);
   const [deletingRecording, setDeletingRecording] = useState(false);
 
-  const fetchRecordings = async (attached, sortBy = "name") => {
+  const fetchRecordings = useCallback(async (attached, sortBy = "name") => {
     const jwt = api.getJWT();
     if (!jwt) {
       router.push("/login");
@@ -44,9 +44,9 @@ export default function ViewRecordings() {
       }
       return [];
     }
-  };
+  }, [router]);
 
-  const loadAllRecordings = async (attachedSort = attachedSortBy, unattachedSort = unattachedSortBy) => {
+  const loadAllRecordings = useCallback(async (attachedSort = attachedSortBy, unattachedSort = unattachedSortBy) => {
     setLoading(true);
     const [attached, unattached] = await Promise.all([
       fetchRecordings(true, attachedSort),
@@ -56,11 +56,11 @@ export default function ViewRecordings() {
     setAttachedRecordings(attached);
     setUnattachedRecordings(unattached);
     setLoading(false);
-  };
+  }, [attachedSortBy, unattachedSortBy, fetchRecordings, setLoading, setAttachedRecordings, setUnattachedRecordings]);
 
   useEffect(() => {
     loadAllRecordings();
-  }, []);
+  }, [loadAllRecordings]);
 
   const handleAttachedSortChange = (newSort) => {
     setAttachedSortBy(newSort);
