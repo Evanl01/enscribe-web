@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import * as api from "@/public/scripts/api.js";
+import * as api from "@/src/lib/api";
 import * as format from "@/public/scripts/format.js";
 import Auth from "@/src/components/Auth.jsx";
 import RecordingPreviewOverlay from "@/src/components/RecordingPreviewOverlay.jsx";

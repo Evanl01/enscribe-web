@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import * as api from "@/public/scripts/api.js";
+import * as api from "@/src/lib/api";
 
 // Directly define checkAuthAndRedirect here
 async function checkAuthAndRedirect(router) {

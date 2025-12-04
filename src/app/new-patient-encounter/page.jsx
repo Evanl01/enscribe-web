@@ -2,7 +2,7 @@
 import { redirect, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import useWakeLock from "@/src/hooks/useWakeLock";
-import * as api from "@/public/scripts/api.js";
+import * as api from "@/src/lib/api";
 import * as ui from "@/public/scripts/ui.js";
 import * as format from "@/public/scripts/format.js";
 import * as validation from "@/public/scripts/validation.js";

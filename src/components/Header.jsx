@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import styled from "styled-components";
 import Image from "next/image";
-import * as api from "@/public/scripts/api.js";
+import * as api from "@/src/lib/api";
 
 const AppHeader = styled.header`
   background-color: #ffffff;

@@ -1,7 +1,7 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect, Suspense } from "react";
-import * as api from "@/public/scripts/api.js";
+import * as api from "@/src/lib/api";
 import * as ui from "@/public/scripts/ui.js";
 import * as format from "@/public/scripts/format.js";
 import PatientEncounterPreviewOverlay from "@/src/components/PatientEncounterPreviewOverlay";

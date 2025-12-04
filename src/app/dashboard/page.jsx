@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import * as api from "@/public/scripts/api.js";
+import * as api from "@/src/lib/api";
 import * as ui from "@/public/scripts/ui.js";
 import * as format from "@/public/scripts/format.js";
 import * as validation from "@/public/scripts/validation.js";
