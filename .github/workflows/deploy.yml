@@ -30,6 +30,9 @@ jobs:
     - name: Run linting
       run: npm run lint
 
+    - name: Clear Next.js cache
+      run: rm -rf .next out
+
     - name: Build Next.js static export
       run: npm run build:prod
       env:

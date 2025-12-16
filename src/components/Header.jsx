@@ -203,8 +203,12 @@ const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  // Sign-out helper: call client API to clear tokens (no redirect) then
-  // navigate via Next router to preserve SPA navigation.
+  // Auth pages where we don't need to redirect on sign out
+  const authRoutes = ['/login/', '/signup/', '/confirm-email/'];
+  const isAuthPage = authRoutes.includes(pathname);
+
+  // Sign-out helper: call client API to clear tokens (no redirect on auth pages)
+  // navigate via Next router to preserve SPA navigation only on protected pages.
   const signOutAndRedirect = async () => {
     try {
       // close menus immediately for UI responsiveness
@@ -213,10 +217,13 @@ const Header = () => {
       // ask api helper to not perform its own redirect
       await api.handleSignOut();
     } catch (e) {
-      // ignore errors here; still redirect to login
+      // ignore errors here; still redirect to login if not on auth page
       // console.warn('signOut error', e);
     } finally {
-      router.push('/login');
+      // Only redirect to login if we're on a protected page
+      if (!isAuthPage) {
+        router.push('/login/');
+      }
     }
   };
 
