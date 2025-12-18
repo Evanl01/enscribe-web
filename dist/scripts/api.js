@@ -1,5 +1,5 @@
 // lib/api.js - API-related functions
-export const API_BASE = import.meta.env.VITE_API_URL || '';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 // Helper to get JWT from localStorage (client-side only)
 export const getJWT = () => {
