@@ -1,7 +1,5 @@
-"use client";
 import React from "react";
-import { useRouter } from "next/navigation";
-import * as format from "@/public/scripts/format.js";
+import * as format from "@/utils/format.js";
 
 export default function RecordingPreviewOverlay({
   selectedRecording,
@@ -11,7 +9,6 @@ export default function RecordingPreviewOverlay({
   onClose,
   onDeleteClick
 }) {
-  const router = useRouter();
 
   if (!selectedRecording) return null;
 

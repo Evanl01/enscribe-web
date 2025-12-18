@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import * as api from '@/lib/api'
-import * as format from '@/scripts/format.js'
+import * as format from '@/utils/format.js'
 import parseSoapNotes from '@/utils/parseSoapNotes'
 
 const DashboardPage = () => {
