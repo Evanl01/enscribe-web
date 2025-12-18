@@ -1,13 +1,13 @@
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import * as api from "@/src/lib/api";
+import { useNavigate } from "react-router-dom";
+import * as api from "@/lib/api";
 
 // Directly define checkAuthAndRedirect here
-async function checkAuthAndRedirect(router) {
+async function checkAuthAndRedirect(navigate) {
   const jwt = api.getJWT();
   if (!jwt) {
     api.deleteJWT();
-    router.push("/login");
+    navigate("/login");
     return;
   }
   
@@ -17,7 +17,7 @@ async function checkAuthAndRedirect(router) {
     if (!result.valid) {
       console.error("<Auth/>: JWT validation failed:", result.error || result.data);
       api.deleteJWT();
-      router.push("/login");
+      navigate("/login");
       return;
     }
     
@@ -25,16 +25,16 @@ async function checkAuthAndRedirect(router) {
   } catch (err) {
     console.error("<Auth/>: Error during JWT validation:", err);
     api.deleteJWT();
-    router.push("/login");
+    navigate("/login");
   }
 }
 
 export default function Auth() {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    checkAuthAndRedirect(router);
-  }, [router]);
+    checkAuthAndRedirect(navigate);
+  }, [navigate]);
 
   return null;
 }

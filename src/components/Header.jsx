@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import styled from "styled-components"
 import * as api from "@/lib/api"
@@ -39,6 +39,10 @@ const HeaderNav = styled.nav`
   gap: 2rem;
 `
 
+const NavItem = styled.div`
+  position: relative;
+`
+
 const DesktopMenu = styled.div`
   display: flex;
   align-items: center;
@@ -59,6 +63,45 @@ const HeaderUserMenu = styled.div`
 
   @media (max-width: 767px) {
     display: none;
+  }
+`
+
+const UserDropdownMenu = styled.div`
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: 8rem;
+  background: #fff;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 102;
+  min-width: 8rem;
+  padding-top: 8px;
+  display: none;
+
+  /* show when parent header user menu is hovered */
+  ${HeaderUserMenu}:hover & {
+    display: block;
+  }
+`
+
+const DropdownMenu = styled.div`
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: 12rem;
+  background-color: #ffffff;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  display: none;
+  z-index: 101;
+  padding-top: 8px;
+
+  ${NavItem}:hover & {
+    display: block;
   }
 `
 
@@ -109,31 +152,19 @@ const UserMenuButton = styled.button`
   }
 `
 
-const DropdownMenu = styled.div`
-  position: absolute;
-  top: 100%;
-  right: 0;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  min-width: 200px;
-  margin-top: 0.5rem;
-  z-index: 101;
-`
-
 const DropdownItem = styled.button`
   display: block;
   width: 100%;
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 1rem;
   text-align: left;
   background: none;
   border: none;
   cursor: pointer;
   color: #333333;
+  font-size: 0.875rem;
 
   &:hover {
-    background: #f5f5f5;
+    background-color: #f3f4f6;
   }
 
   &:first-child {
@@ -150,8 +181,6 @@ const DropdownItem = styled.button`
 const Header = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   // Auth pages where we don't need to redirect on sign out
   const authRoutes = ['/login', '/signup', '/confirm-email']
@@ -160,9 +189,6 @@ const Header = () => {
   // Sign-out helper: call client API to clear tokens (no redirect on auth pages)
   const signOutAndRedirect = async () => {
     try {
-      // close menus immediately for UI responsiveness
-      setUserMenuOpen(false)
-      setMenuOpen(false)
       // ask api helper to clear tokens
       await api.handleSignOut()
     } catch (e) {
@@ -212,45 +238,70 @@ const Header = () => {
   return (
     <AppHeader>
       <HeaderContainer>
-        <AppTitle onClick={() => navigate('/')}>EmScribe</AppTitle>
+        <div
+          onClick={() => navigate('/')}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            cursor: "pointer",
+            textDecoration: "none",
+          }}
+        >
+          <img
+            src="/emscribe-icon128.png"
+            alt="EmScribe Logo"
+            width={20}
+            height={20}
+            style={{ marginRight: "0.75rem" }}
+          />
+          <AppTitle style={{ margin: 0, color: "#333333" }}>
+            EmScribe
+          </AppTitle>
+        </div>
 
         <HeaderNav>
           <DesktopMenu>
             {navigation.map((nav) => (
-              <div key={nav.category}>
+              <NavItem key={nav.category}>
                 {nav.items.length === 0 ? (
                   <NavButton onClick={() => navigate(nav.path)}>
                     {nav.category}
                   </NavButton>
                 ) : (
-                  <NavButton>{nav.category}</NavButton>
+                  <>
+                    <NavButton>{nav.category}</NavButton>
+                    <DropdownMenu>
+                      {nav.items.map((item) => (
+                        <DropdownItem
+                          key={item.path}
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.name}
+                        </DropdownItem>
+                      ))}
+                    </DropdownMenu>
+                  </>
                 )}
-              </div>
+              </NavItem>
             ))}
           </DesktopMenu>
 
           <HeaderUserMenu>
-            <UserMenuButton onClick={() => setUserMenuOpen(!userMenuOpen)}>
+            <UserMenuButton>
               User Menu ▼
             </UserMenuButton>
-            {userMenuOpen && (
-              <DropdownMenu>
-                <DropdownItem onClick={() => navigate('/dashboard')}>
-                  Dashboard
-                </DropdownItem>
-                <DropdownItem onClick={() => navigate('/privacy-policy')}>
-                  Privacy Policy
-                </DropdownItem>
-                <DropdownItem onClick={signOutAndRedirect}>
-                  Sign Out
-                </DropdownItem>
-              </DropdownMenu>
-            )}
+            <UserDropdownMenu>
+              <DropdownItem onClick={() => navigate('/dashboard')}>
+                Dashboard
+              </DropdownItem>
+              <DropdownItem onClick={() => navigate('/privacy-policy')}>
+                Privacy Policy
+              </DropdownItem>
+              <DropdownItem onClick={signOutAndRedirect}>
+                Sign Out
+              </DropdownItem>
+            </UserDropdownMenu>
           </HeaderUserMenu>
-
-          <MobileMenuButton onClick={() => setMenuOpen(!menuOpen)}>
-            ☰
-          </MobileMenuButton>
         </HeaderNav>
       </HeaderContainer>
     </AppHeader>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { exportDataAsFile } from "@/public/scripts/export.js";
+import { exportDataAsFile } from "@/scripts/export.js";
 
 export default function ExportDataAsFileMenu({
   patientEncounterData,

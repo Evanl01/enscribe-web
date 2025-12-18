@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import { Document, Packer, Paragraph, HeadingLevel } from "docx";
 import { saveAs } from "file-saver";
-import * as format from "@/public/scripts/format.js";
+import * as format from "@/scripts/format.js";
 /**
  * Export patient encounter data as PDF or Word.
  * Only includes sections present in the data object.
