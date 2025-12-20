@@ -319,21 +319,20 @@ export const getPatientEncounterComplete = async (id) => {
 };
 
 // Update patient encounter (name and transcript)
-export const updatePatientEncounter = async (id, { name, transcript_text }) => {
+export const updatePatientEncounterAndTranscript = async (id, { name, transcript_text }) => {
   const jwt = getJWT();
   if (!jwt) {
     throw new Error('User not logged in');
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/patient-encounters`, {
+    const response = await fetch(`${API_BASE}/api/patient-encounters/${id}/update-with-transcript`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${jwt}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        id,
         name,
         transcript_text,
       }),
@@ -341,8 +340,16 @@ export const updatePatientEncounter = async (id, { name, transcript_text }) => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Failed to save patient encounter: ${response.status} ${response.statusText}`);
+      let detailedError = `Failed to save patient encounter: ${response.status} ${response.statusText}`;
+      try {
+        const errorText = await response.text();
+        if (errorText) {
+          detailedError += `\nServer response: ${errorText}`;
+        }
+      } catch (e) {
+        // ignore error parsing response
+      }
+      throw new Error(detailedError);
     }
 
     return await response.json();

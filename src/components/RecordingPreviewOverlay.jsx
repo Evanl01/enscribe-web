@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import * as format from "@/utils/format.js";
 
 export default function RecordingPreviewOverlay({
@@ -9,6 +10,7 @@ export default function RecordingPreviewOverlay({
   onClose,
   onDeleteClick
 }) {
+  const navigate = useNavigate();
 
   if (!selectedRecording) return null;
 
@@ -137,7 +139,7 @@ export default function RecordingPreviewOverlay({
                 <button
                   onClick={() => {
                     const path = selectedRecording.path;
-                    router.push(`/new-patient-encounter?recordingPath=${encodeURIComponent(path)}`);
+                    navigate(`/new-patient-encounter?recordingPath=${encodeURIComponent(path)}`);
                   }}
                   style={{
                     backgroundColor: "#10b981",
@@ -194,7 +196,7 @@ export default function RecordingPreviewOverlay({
                 onClick={() => {
                   const patientEncounterId = selectedRecording.patientEncounter?.id;
                   if (patientEncounterId) {
-                    router.push(`/edit-patient-encounter?id=${patientEncounterId}`);
+                    navigate(`/edit-patient-encounter?id=${patientEncounterId}`);
                   }
                 }}
                 style={{
