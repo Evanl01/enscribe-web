@@ -72,15 +72,15 @@ export default function NewPatientEncounterPage() {
 
   // LocalStorage keys
   const LS_KEYS = {
-    patientEncounterName: "emscribe_patientEncounterName",
-    transcript: "emscribe_transcript",
-    soapSubjective: "emscribe_soapSubjective",
-    soapObjective: "emscribe_soapObjective",
-    soapAssessment: "emscribe_soapAssessment",
-    soapPlan: "emscribe_soapPlan",
-    billingSuggestion: "emscribe_billingSuggestion",
-    recordingFileMetadata: "emscribe_recordingFileMetadata", // <-- renamed from audioFileMetadata
-    recordingFile: "emscribe_recordingFile", // (optional, if you use this elsewhere)
+    patientEncounterName: "enscribe_patientEncounterName",
+    transcript: "enscribe_transcript",
+    soapSubjective: "enscribe_soapSubjective",
+    soapObjective: "enscribe_soapObjective",
+    soapAssessment: "enscribe_soapAssessment",
+    soapPlan: "enscribe_soapPlan",
+    billingSuggestion: "enscribe_billingSuggestion",
+    recordingFileMetadata: "enscribe_recordingFileMetadata", // <-- renamed from audioFileMetadata
+    recordingFile: "enscribe_recordingFile", // (optional, if you use this elsewhere)
   };
     // Load recording file from localStorage on page mount only
   useEffect(() => {
@@ -254,8 +254,8 @@ export default function NewPatientEncounterPage() {
 
       let lsOk = true;
       try {
-        localStorage.setItem("emscribe_localstorage_test", "1");
-        localStorage.removeItem("emscribe_localstorage_test");
+        localStorage.setItem("enscribe_localstorage_test", "1");
+        localStorage.removeItem("enscribe_localstorage_test");
         lsOk = true;
       } catch (e) {
         lsOk = false;

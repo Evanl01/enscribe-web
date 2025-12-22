@@ -18,11 +18,11 @@ export const showToast = (message, type = 'info') => {
   if (typeof window === 'undefined') return;
   
   // Create toast element if it doesn't exist
-  let toast = document.getElementById('emscribe-toast');
+  let toast = document.getElementById('enscribe-toast');
   if (!toast) {
     toast = document.createElement('div');
-    toast.id = 'emscribe-toast';
-    toast.className = 'emscribe-toast';
+    toast.id = 'enscribe-toast';
+    toast.className = 'enscribe-toast';
     
     // Add basic styles
     toast.style.cssText = `

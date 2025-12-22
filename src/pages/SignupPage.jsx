@@ -60,7 +60,7 @@ export default function SignupPage() {
         .error { color: #d32f2f; margin-bottom: 10px; }
       `}</style>
       <div className="signup-container">
-        <h2>EmScribe Sign Up</h2>
+        <h2>EnScribe Sign Up</h2>
         <div className="error" id="error">
           {error}
         </div>

@@ -35,14 +35,14 @@ export default function PrivacyPolicyPage() {
         <p className="last-updated">Last Updated: August 10, 2025</p>
         
         <div className="highlight-box">
-          <p><strong>EmScribe</strong> is committed to protecting the privacy and security of patient health information. This Privacy Policy explains how we collect, use, protect, and disclose information in compliance with HIPAA and other applicable privacy laws.</p>
+          <p><strong>EnScribe</strong> is committed to protecting the privacy and security of patient health information. This Privacy Policy explains how we collect, use, protect, and disclose information in compliance with HIPAA and other applicable privacy laws.</p>
         </div>
 
         <div className="section">
           <h2>1. Information We Collect</h2>
           
           <h3>Protected Health Information (PHI)</h3>
-          <p>As a healthcare technology service, EmScribe processes the following types of protected health information:</p>
+          <p>As a healthcare technology service, EnScribe processes the following types of protected health information:</p>
           <ul>
             <li><strong>Audio recordings</strong> of patient-provider consultations and medical visits</li>
             <li><strong>Transcribed medical conversations</strong> containing patient health information</li>
@@ -63,7 +63,7 @@ export default function PrivacyPolicyPage() {
 
         <div className="section">
           <h2>2. How We Use Information</h2>
-          <p>EmScribe uses collected information solely for the following purposes:</p>
+          <p>EnScribe uses collected information solely for the following purposes:</p>
           <ul>
             <li><strong>Transcription Services:</strong> Converting audio recordings into accurate text transcriptions</li>
             <li><strong>SOAP Note Generation:</strong> Creating structured medical documentation from transcribed content</li>
@@ -77,7 +77,7 @@ export default function PrivacyPolicyPage() {
         <div className="section">
           <h2>3. HIPAA Compliance</h2>
           <div className="highlight-box">
-            <p className="important">EmScribe operates as a Business Associate under HIPAA and maintains strict compliance with all applicable regulations.</p>
+            <p className="important">Enscribe operates as a Business Associate under HIPAA and maintains strict compliance with all applicable regulations.</p>
           </div>
           
           <h3>Security Safeguards</h3>
@@ -95,7 +95,7 @@ export default function PrivacyPolicyPage() {
 
         <div className="section">
           <h2>4. Data Sharing and Disclosure</h2>
-          <p>EmScribe does <strong>NOT</strong> sell, rent, or share PHI with third parties except in the following limited circumstances:</p>
+          <p>Enscribe does <strong>NOT</strong> sell, rent, or share PHI with third parties except in the following limited circumstances:</p>
           
           <ul>
             <li><strong>Healthcare Providers:</strong> Returning processed transcriptions and SOAP notes to the originating healthcare provider</li>
@@ -119,7 +119,7 @@ export default function PrivacyPolicyPage() {
 
         <div className="section">
           <h2>6. Your Rights</h2>
-          <p>As a patient whose information may be processed through EmScribe, you have the following rights:</p>
+          <p>As a patient whose information may be processed through Enscribe, you have the following rights:</p>
           
           <ul>
             <li><strong>Access:</strong> Request access to your PHI that we process</li>
@@ -139,7 +139,7 @@ export default function PrivacyPolicyPage() {
 
         <div className="section">
           <h2>8. Breach Notification</h2>
-          <p>In the unlikely event of a data breach involving PHI, EmScribe will:</p>
+          <p>In the unlikely event of a data breach involving PHI, Enscribe will:</p>
           <ul>
             <li>Notify affected healthcare providers within 24 hours of discovery</li>
             <li>Assist healthcare providers in patient notification as required by law</li>
@@ -164,7 +164,7 @@ export default function PrivacyPolicyPage() {
         </div>
 
         <div className="highlight-box">
-          <p><strong>Notice:</strong> This Privacy Policy applies specifically to EmScribe's processing of health information. Your healthcare provider may have additional privacy policies governing your medical records and care.</p>
+          <p><strong>Notice:</strong> This Privacy Policy applies specifically to Enscribe's processing of health information. Your healthcare provider may have additional privacy policies governing your medical records and care.</p>
         </div>
       </div>
     </main>

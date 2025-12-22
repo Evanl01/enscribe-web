@@ -41,7 +41,7 @@ export default function LoginPage() {
         .error { color: #d32f2f; margin-bottom: 10px; }
       `}</style>
       <div className="login-container">
-        <h2>EmScribe Login</h2>
+        <h2>EnScribe Login</h2>
         <div className="error">
           {error}
         </div>
