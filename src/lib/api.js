@@ -215,7 +215,7 @@ export const getAllTranscripts = async () => {
 export const getAllSoapNotes = async () => {
   const jwt = getJWT();
   try {
-    const res = await fetch(`${API_BASE}/api/soap-notes/batch`, {
+    const res = await fetch(`${API_BASE}/api/soap-notes`, {
       headers: { 'Authorization': `Bearer ${jwt}` }
     });
 
@@ -268,7 +268,7 @@ export const getAllPatientEncounters = async () => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/patient-encounters/batch`, {
+    const response = await fetch(`${API_BASE}/api/patient-encounters`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${jwt}`,
