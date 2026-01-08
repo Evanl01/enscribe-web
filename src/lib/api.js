@@ -239,7 +239,7 @@ export const getSoapNoteById = async (id) => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/soap-notes?id=${id}`, {
+    const response = await fetch(`${API_BASE}/api/soap-notes/${id}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${jwt}`,
@@ -297,7 +297,7 @@ export const getPatientEncounterComplete = async (id) => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/patient-encounters/complete?id=${id}`, {
+    const response = await fetch(`${API_BASE}/api/patient-encounters/complete/${id}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${jwt}`,
@@ -635,7 +635,7 @@ export const deleteDotPhrase = async (id) => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/dotPhrases?id=${id}`, {
+    const response = await fetch(`${API_BASE}/api/dotPhrases/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${jwt}`,
@@ -700,7 +700,7 @@ export const getRecordingById = async (id) => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/recordings?id=${id}`, {
+    const response = await fetch(`${API_BASE}/api/recordings/${id}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${jwt}`,

@@ -196,7 +196,7 @@ export default function RecordingPreviewOverlay({
                 onClick={() => {
                   const patientEncounterId = selectedRecording.patientEncounter?.id;
                   if (patientEncounterId) {
-                    navigate(`/edit-patient-encounter?id=${patientEncounterId}`);
+                    navigate(`/edit-patient-encounter/${patientEncounterId}`);
                   }
                 }}
                 style={{
