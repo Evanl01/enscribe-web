@@ -472,7 +472,7 @@ export const getAllDotPhrases = async () => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/dotPhrases`, {
+    const response = await fetch(`${API_BASE}/api/dot-phrases`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${jwt}`,
@@ -483,7 +483,9 @@ export const getAllDotPhrases = async () => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}`);
+      const error = new Error(errorData.message || `HTTP ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
 
     return await response.json();
@@ -541,14 +543,13 @@ export const patchSoapNote = async (id, { soapNote_text }) => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/soap-notes`, {
+    const response = await fetch(`${API_BASE}/api/soap-notes/${id}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${jwt}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        id,
         soapNote_text,
       }),
       cache: 'no-store',
@@ -566,16 +567,16 @@ export const patchSoapNote = async (id, { soapNote_text }) => {
   }
 };
 
-// Save dot phrase to backend (create new or update existing)
-export const saveDotPhrase = async (dotPhraseObj, method = 'POST') => {
+// Create new dot phrase
+export const createDotPhrase = async (dotPhraseObj) => {
   const jwt = getJWT();
   if (!jwt) {
     throw new Error('User not logged in');
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/dotPhrases`, {
-      method,
+    const response = await fetch(`${API_BASE}/api/dot-phrases`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${jwt}`,
@@ -585,12 +586,45 @@ export const saveDotPhrase = async (dotPhraseObj, method = 'POST') => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}`);
+      const error = new Error(errorData.message || `HTTP ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Error saving dot phrase:', error);
+    console.error('Error creating dot phrase:', error);
+    throw error;
+  }
+};
+
+// Update existing dot phrase (ID in URL path)
+export const updateDotPhrase = async (id, dotPhraseObj) => {
+  const jwt = getJWT();
+  if (!jwt) {
+    throw new Error('User not logged in');
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/api/dot-phrases/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${jwt}`,
+      },
+      body: JSON.stringify(dotPhraseObj),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error = new Error(errorData.message || `HTTP ${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating dot phrase:', error);
     throw error;
   }
 };
@@ -635,7 +669,7 @@ export const deleteDotPhrase = async (id) => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/dotPhrases/${id}`, {
+    const response = await fetch(`${API_BASE}/api/dot-phrases/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${jwt}`,
@@ -645,7 +679,9 @@ export const deleteDotPhrase = async (id) => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}`);
+      const error = new Error(errorData.message || `HTTP ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
 
     return await response.json();

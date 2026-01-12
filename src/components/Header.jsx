@@ -225,7 +225,7 @@ const Header = () => {
       category: "SOAP Notes",
       items: [
         { name: "View SOAP Notes", path: "/view-soap-notes" },
-        { name: "Edit SOAP Note", path: "/edit-soap-note" },
+        // { name: "Edit SOAP Note", path: "/edit-soap-note" },
       ],
     },
     {

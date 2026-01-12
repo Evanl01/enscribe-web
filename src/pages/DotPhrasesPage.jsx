@@ -10,6 +10,7 @@ export default function DotPhrasesPage() {
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [editValues, setEditValues] = useState({ trigger: "", expansion: "" });
   const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [error, setError] = useState(null);
 
   const fetchDotPhrases = useCallback(async () => {
     const jwt = api.getJWT();
@@ -18,10 +19,18 @@ export default function DotPhrasesPage() {
       return;
     }
     try {
+      setError(null);
       const data = await api.getAllDotPhrases();
       setDotPhrases(data);
     } catch (error) {
-      navigate("/login");
+      // Only logout on 401 (authentication error)
+      if (error.status === 401) {
+        navigate("/login");
+      } else {
+        // Show user-friendly error for other failures (404, 500, etc)
+        setError(`Failed to load dot phrases: ${error.message}`);
+        setDotPhrases([]);
+      }
     }
   }, [navigate]);
 
@@ -45,22 +54,35 @@ export default function DotPhrasesPage() {
         await api.deleteDotPhrase(dotPhrase.id);
         window.location.reload();
       } catch (error) {
-        console.error("Delete failed:", error);
+        if (error.status === 401) {
+          navigate("/login");
+        } else {
+          setError(`Delete failed: ${error.message}`);
+        }
       }
     }
   };
 
   const handleSave = async () => {
     try {
-      const method = isCreatingNew ? "POST" : "PATCH";
-      const body = isCreatingNew 
-        ? { trigger: editValues.trigger, expansion: editValues.expansion }
-        : { id: selectedRowId, trigger: editValues.trigger, expansion: editValues.expansion };
-
-      await api.saveDotPhrase(body, method);
+      if (isCreatingNew) {
+        await api.createDotPhrase({ 
+          trigger: editValues.trigger, 
+          expansion: editValues.expansion 
+        });
+      } else {
+        await api.updateDotPhrase(selectedRowId, { 
+          trigger: editValues.trigger, 
+          expansion: editValues.expansion 
+        });
+      }
       window.location.reload();
     } catch (error) {
-      console.error("Save failed:", error);
+      if (error.status === 401) {
+        navigate("/login");
+      } else {
+        setError(`Save failed: ${error.message}`);
+      }
     }
   };
 
@@ -68,6 +90,7 @@ export default function DotPhrasesPage() {
     setSelectedRowId(null);
     setIsCreatingNew(false);
     setEditValues({ trigger: "", expansion: "" });
+    setError(null);
   };
 
   const handleCreateNew = () => {
@@ -99,11 +122,24 @@ export default function DotPhrasesPage() {
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {error}
+            <button
+              onClick={() => setError(null)}
+              className="ml-4 text-red-600 hover:text-red-800 underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* Dot Phrases List */}
         <div className="bg-white border border-gray-200 rounded-b-lg">
           {dotPhrases.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              No dot phrases found. Create your first one below!
+              {error ? "Unable to load dot phrases" : "No dot phrases found. Create your first one below!"}
             </div>
           ) : (
             dotPhrases.map((dotPhrase) => (
