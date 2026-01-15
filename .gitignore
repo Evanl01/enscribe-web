@@ -42,6 +42,10 @@ yarn-error.log*
 # Allow committing .env.production (contains public API URLs only)
 !.env.production
 
+# AWS/SSH keys
+/keys
+/keys/**
+
 # vercel
 .vercel
 
