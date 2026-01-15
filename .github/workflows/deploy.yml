@@ -30,7 +30,7 @@ jobs:
     - name: Build Vite app
       run: npm run build
       env:
-        VITE_API_URL: https://emscribe.vercel.app
+        VITE_API_URL: https://api.enscribe.sjpedgi.doctor
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
