@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import * as api from '@/lib/api'
 import * as format from '@/utils/format.js'
 import parseSoapNotes from '@/utils/parseSoapNotes'
+import Auth from '@/components/Auth.jsx'
 
 const DashboardPage = () => {
   const navigate = useNavigate()
@@ -115,7 +116,9 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="dashboard-container" style={{ padding: '20px', width: '100%' }}>
+    <>
+      <Auth />
+      <div className="dashboard-container" style={{ padding: '20px', width: '100%' }}>
       {error && (
         <div style={{ color: '#d32f2f', marginBottom: '20px', padding: '10px', backgroundColor: '#ffebee', borderRadius: '4px' }}>
           {error}
@@ -308,7 +311,8 @@ const DashboardPage = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }
 
