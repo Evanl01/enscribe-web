@@ -49,7 +49,7 @@ export default function ViewSoapNotesPage() {
   });
 
   const handleCardClick = (id) => {
-    navigate(`/edit-soap-note?id=${id}`);
+    navigate(`/edit-soap-note/${id}`);
   };
 
   return (

@@ -1,4 +1,4 @@
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import React, { useState, useRef, useEffect } from "react";
 import * as api from "@/lib/api";
 import * as ui from "@/utils/ui.js";
@@ -11,8 +11,7 @@ import parseSoapNotes from "@/utils/parseSoapNotes";
 
 export default function EditSoapNotePage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const soapNoteIdRaw = searchParams.get("id");
+  const { id: soapNoteIdRaw } = useParams();
   const soapNoteId = soapNoteIdRaw ? parseInt(soapNoteIdRaw, 10) : null;
 
   // State management

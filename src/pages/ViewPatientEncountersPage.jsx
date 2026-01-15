@@ -40,7 +40,7 @@ const ViewPatientEncountersPage = () => {
   })
 
   const handleCardClick = (id) => {
-    navigate(`/edit-patient-encounter?id=${id}`)
+    navigate(`/edit-patient-encounter/${id}`)
   }
 
   return (

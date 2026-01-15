@@ -99,11 +99,11 @@ const DashboardPage = () => {
 
   // Navigation handlers
   const editSoapNote = (id) => {
-    navigate(`/edit-soap-note?id=${id}`)
+    navigate(`/edit-soap-note/${id}`)
   }
 
   const editPatientEncounter = (id) => {
-    navigate(`/edit-patient-encounter?id=${id}`)
+    navigate(`/edit-patient-encounter/${id}`)
   }
 
   if (loading) {

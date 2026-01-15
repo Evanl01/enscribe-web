@@ -26,10 +26,10 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/new-patient-encounter" element={<NewPatientEncounterPage />} />
         <Route path="/view-patient-encounters" element={<ViewPatientEncountersPage />} />
-        <Route path="/edit-patient-encounter" element={<EditPatientEncounterPage />} />
+        <Route path="/edit-patient-encounter/:id" element={<EditPatientEncounterPage />} />
         <Route path="/view-recordings" element={<ViewRecordingsPage />} />
         <Route path="/view-soap-notes" element={<ViewSoapNotesPage />} />
-        <Route path="/edit-soap-note" element={<EditSoapNotePage />} />
+        <Route path="/edit-soap-note/:id" element={<EditSoapNotePage />} />
         <Route path="/dot-phrases" element={<DotPhrasesPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
