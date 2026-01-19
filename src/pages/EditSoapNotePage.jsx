@@ -66,6 +66,7 @@ export default function EditSoapNotePage() {
         if (!patientEncounterId)
           throw new Error("Associated Patient Encounter not found");
         
+        setPatientEncounterId(patientEncounterId);
         const patientEncounterDataRaw = await api.getPatientEncounterComplete(patientEncounterId);
         const patientEncounterData = patientEncounterDataRaw.patientEncounter;
         setPatientEncounterName(patientEncounterData.name || "");
@@ -251,7 +252,7 @@ export default function EditSoapNotePage() {
               <div className="mt-2 text-red-600 text-sm font-medium">
                 This field is view-only. To change, go to{" "}
                 <a
-                  href={`/edit-patient-encounter?id=${patientEncounterId}`}
+                  href={`/edit-patient-encounter/${patientEncounterId}`}
                   className="text-blue-600 underline text-sm font-medium"
                   style={{ whiteSpace: "nowrap" }}
                   target="_blank"

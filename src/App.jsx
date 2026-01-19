@@ -14,6 +14,7 @@ import EditSoapNotePage from '@/pages/EditSoapNotePage'
 import DotPhrasesPage from '@/pages/DotPhrasesPage'
 import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage'
 import NotFoundPage from '@/pages/NotFoundPage'
+import ComplianceAuditPage from '@/pages/ComplianceAuditPage'
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<NotFoundPage />} />
+        <Route path="/compliance-audit" element={<ComplianceAuditPage />} />
       </Routes>
     </Router>
   )

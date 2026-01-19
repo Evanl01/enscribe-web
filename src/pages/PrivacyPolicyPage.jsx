@@ -32,7 +32,7 @@ export default function PrivacyPolicyPage() {
           </button>
         </div>
         
-        <p className="last-updated">Last Updated: August 10, 2025</p>
+        <p className="last-updated">Last Updated: January 15, 2026</p>
         
         <div className="highlight-box">
           <p><strong>EnScribe</strong> is committed to protecting the privacy and security of patient health information. This Privacy Policy explains how we collect, use, protect, and disclose information in compliance with HIPAA and other applicable privacy laws.</p>
@@ -82,7 +82,8 @@ export default function PrivacyPolicyPage() {
           
           <h3>Security Safeguards</h3>
           <ul>
-            <li><strong>Encryption:</strong> All PHI is encrypted both in transit and at rest using industry-standard AES-256 encryption</li>
+            <li><strong>PHI Masking:</strong> Audio recordings are processed using AWS Comprehend Medical under a HIPAA Business Associate Agreement to automatically detect and remove identifiable patient information before any further processing</li>
+            <li><strong>Encryption:</strong> All PHI is encrypted both in transit and at rest using advanced encryption techniques (see Section 7 for details)</li>
             <li><strong>Access Controls:</strong> Multi-factor authentication and role-based access restrictions</li>
             <li><strong>Audit Logging:</strong> Comprehensive logging of all system access and PHI handling</li>
             <li><strong>Staff Training:</strong> Regular HIPAA compliance training for all personnel</li>
@@ -95,16 +96,25 @@ export default function PrivacyPolicyPage() {
 
         <div className="section">
           <h2>4. Data Sharing and Disclosure</h2>
+          <p><strong>Core Principle:</strong> We do not send any data that may reasonably identify a patient to vendors who do not have HIPAA Business Associate Agreements.</p>
+          
           <p>Enscribe does <strong>NOT</strong> sell, rent, or share PHI with third parties except in the following limited circumstances:</p>
           
           <ul>
             <li><strong>Healthcare Providers:</strong> Returning processed transcriptions and SOAP notes to the originating healthcare provider</li>
-            <li><strong>Business Associates:</strong> Sharing with vetted third-party services that assist in our operations (all covered by HIPAA Business Associate Agreements)</li>
+            <li><strong>Business Associates under HIPAA Agreements:</strong>
+              <ul>
+                <li>Amazon Web Services (AWS) - Backend infrastructure (EC2), storage (S3/CloudFront), and AWS Comprehend Medical for PHI masking</li>
+                <li>Google Cloud (Cloud Run) - Transcription processing services</li>
+                <li>Supabase - Encrypted data storage for transcripts and SOAP notes</li>
+              </ul>
+            </li>
+            <li><strong>Data Processing:</strong> Patient-identifiable information is masked using AWS Comprehend Medical before being processed by any third-party services</li>
             <li><strong>Legal Requirements:</strong> When required by law, court order, or regulatory authority</li>
             <li><strong>Emergency Situations:</strong> To prevent serious harm to patient safety when legally permitted</li>
           </ul>
 
-          <p>Any third-party service providers we work with must sign comprehensive Business Associate Agreements and meet the same security standards we maintain.</p>
+          <p>All third-party service providers we work with have signed HIPAA Business Associate Agreements and meet the same security standards we maintain.</p>
         </div>
 
         <div className="section">
@@ -133,8 +143,39 @@ export default function PrivacyPolicyPage() {
         </div>
 
         <div className="section">
-          <h2>7. Secure and encrypted patient data</h2>
-          <p>All PHI is processed and stored within our SHA-256 compliant database, including audio files, transcripts of patient encounters and SOAP notes. We follow HIPAA guidelines to ensure the confidentiality and security of information at all parts of the website.</p>
+          <h2>7. Encryption and Data Protection</h2>
+          
+          <h3>Multi-Layer Encryption Approach</h3>
+          <p>EnScribe uses a hybrid encryption scheme to protect different types of patient data:</p>
+          
+          <h4>Patient Records & Medical Information</h4>
+          <ul>
+            <li>Each patient record is encrypted using industry-standard 256-bit encryption</li>
+            <li>The encryption keys themselves are additionally secured with an extra layer of protection</li>
+            <li>Every patient's information receives its own unique encryption key for individual-level protection</li>
+          </ul>
+          
+          <h4>Login & Account Security</h4>
+          <ul>
+            <li>Access tokens are encrypted and additionally secured with advanced hashing techniques</li>
+            <li>This prevents unauthorized access even if someone obtained the encrypted tokens</li>
+          </ul>
+          
+          <h4>Medical Transcripts (PHI Protection)</h4>
+          <ul>
+            <li>Before storage, AWS Comprehend Medical automatically identifies and masks sensitive patient information (names, dates, medical record numbers)</li>
+            <li>Patient-identifiable information is replaced with secure tokens</li>
+            <li>Only de-identified transcripts are processed by downstream services</li>
+          </ul>
+          
+          <h4>Data Storage</h4>
+          <ul>
+            <li>All encrypted data is stored securely in Supabase with AES encryption at rest</li>
+            <li>Audio recordings are stored in encrypted Supabase Storage buckets</li>
+            <li>Encryption keys are stored securely and only accessible by authorized systems</li>
+          </ul>
+          
+          <p>We follow HIPAA guidelines to ensure the confidentiality and security of information throughout the entire EnScribe platform.</p>
         </div>
 
         <div className="section">
