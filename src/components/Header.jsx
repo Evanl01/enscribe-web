@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import styled from "styled-components"
 import * as api from "@/lib/api"
@@ -48,7 +48,7 @@ const DesktopMenu = styled.div`
   align-items: center;
   gap: 2rem;
 
-  @media (max-width: 767px) {
+  @media (max-width: 1023px) {
     display: none;
   }
 `
@@ -61,7 +61,7 @@ const HeaderUserMenu = styled.div`
   margin-left: 2rem;
   position: relative;
 
-  @media (max-width: 767px) {
+  @media (max-width: 1023px) {
     display: none;
   }
 `
@@ -70,19 +70,158 @@ const UserDropdownMenu = styled.div`
   position: absolute;
   right: 0;
   top: 100%;
-  width: 8rem;
+  width: 12rem;
   background: #fff;
   border-radius: 0.375rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
   z-index: 102;
-  min-width: 8rem;
+  min-width: 12rem;
   padding-top: 8px;
   display: none;
 
   /* show when parent header user menu is hovered */
   ${HeaderUserMenu}:hover & {
     display: block;
+  }
+`
+
+const HamburgerMenu = styled.div`
+  display: none;
+  flex-shrink: 0;
+
+  @media (max-width: 1023px) {
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+`
+
+const HamburgerButton = styled.button`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+
+  span {
+    width: 24px;
+    height: 2px;
+    background-color: #333333;
+    transition: all 0.3s ease;
+    display: block;
+
+    &:nth-child(1) {
+      transform: ${props => props.isOpen ? 'rotate(45deg) translateY(10px)' : 'rotate(0)'};
+    }
+
+    &:nth-child(2) {
+      opacity: ${props => props.isOpen ? '0' : '1'};
+    }
+
+    &:nth-child(3) {
+      transform: ${props => props.isOpen ? 'rotate(-45deg) translateY(-10px)' : 'rotate(0)'};
+    }
+  }
+
+  &:hover span {
+    background-color: #1976d2;
+  }
+`
+
+const MobileDropdownMenu = styled.div`
+  position: fixed;
+  top: 70px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(100vh - 70px);
+  background: #fff;
+  z-index: 101;
+  overflow-y: auto;
+  display: ${props => props.isOpen ? 'block' : 'none'};
+`
+
+const MobileNavSection = styled.div`
+  padding: 0;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid #e5e7eb;
+  }
+`
+
+const MobileNavSectionTitle = styled.div`
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: #333333;
+  font-size: 0.875rem;
+  background-color: #f9fafb;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+`
+
+const MobileNavItem = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #333333;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #e8e8e8;
+  }
+`
+
+const MobileSubMenu = styled.div`
+  display: ${props => props.isExpanded ? 'block' : 'none'};
+  background-color: #f5f5f5;
+  border-left: 3px solid #1976d2;
+`
+
+const MobileSubItem = styled.button`
+  display: block;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  padding-left: ${props => props.indent || '2rem'};
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #333333;
+  font-size: 0.875rem;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #e8e8e8;
+  }
+`
+
+const SettingsButton = styled.button`
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #333333;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: #1976d2;
   }
 `
 
@@ -105,18 +244,6 @@ const DropdownMenu = styled.div`
   }
 `
 
-const MobileMenuButton = styled.button`
-  display: block;
-  padding: 0.5rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-
-  @media (min-width: 768px) {
-    display: none;
-  }
-`
-
 const NavButton = styled.button`
   display: flex;
   align-items: center;
@@ -132,23 +259,6 @@ const NavButton = styled.button`
 
   &:hover {
     color: #1976d2;
-  }
-`
-
-const UserMenuButton = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: #f5f5f5;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.95rem;
-  color: #333333;
-
-  &:hover {
-    background: #eeeeee;
   }
 `
 
@@ -181,6 +291,8 @@ const DropdownItem = styled.button`
 const Header = () => {
   const location = useLocation()
   const navigate = useNavigate()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [expandedSections, setExpandedSections] = useState({})
 
   // Auth pages where we don't need to redirect on sign out
   const authRoutes = ['/login', '/signup', '/confirm-email']
@@ -188,6 +300,7 @@ const Header = () => {
 
   // Sign-out helper: call client API to clear tokens (no redirect on auth pages)
   const signOutAndRedirect = async () => {
+    setIsMobileMenuOpen(false)
     try {
       // ask api helper to clear tokens
       await api.handleSignOut()
@@ -200,6 +313,20 @@ const Header = () => {
         navigate('/login')
       }
     }
+  }
+
+  // Handle navigation and close mobile menu
+  const handleNavigation = (path) => {
+    setIsMobileMenuOpen(false)
+    navigate(path)
+  }
+
+  // Toggle submenu expansion
+  const toggleSubmenu = (category) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }))
   }
 
   const navigation = [
@@ -287,13 +414,10 @@ const Header = () => {
           </DesktopMenu>
 
           <HeaderUserMenu>
-            <UserMenuButton>
-              User Menu ▼
-            </UserMenuButton>
+            <SettingsButton title="Settings">
+              <img src="/settings-gear.svg" alt="Settings" width="30" height="30" />
+            </SettingsButton>
             <UserDropdownMenu>
-              <DropdownItem onClick={() => navigate('/dashboard')}>
-                Dashboard
-              </DropdownItem>
               <DropdownItem onClick={() => navigate('/privacy-policy')}>
                 Privacy Policy
               </DropdownItem>
@@ -302,6 +426,59 @@ const Header = () => {
               </DropdownItem>
             </UserDropdownMenu>
           </HeaderUserMenu>
+
+          <HamburgerMenu>
+            <HamburgerButton 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              isOpen={isMobileMenuOpen}
+            >
+              <span></span>
+              <span></span>
+              <span></span>
+            </HamburgerButton>
+            <MobileDropdownMenu isOpen={isMobileMenuOpen}>
+              {navigation.map((nav) => (
+                <div key={nav.category}>
+                  {nav.items.length === 0 ? (
+                    <MobileNavItem onClick={() => handleNavigation(nav.path)}>
+                      {nav.category}
+                    </MobileNavItem>
+                  ) : (
+                    <>
+                      <MobileNavItem onClick={() => toggleSubmenu(nav.category)}>
+                        <span>{nav.category}</span>
+                        <span>{expandedSections[nav.category] ? '▲' : '▼'}</span>
+                      </MobileNavItem>
+                      <MobileSubMenu isExpanded={expandedSections[nav.category]}>
+                        {nav.items.map((item) => (
+                          <MobileSubItem
+                            key={item.path}
+                            onClick={() => handleNavigation(item.path)}
+                          >
+                            {item.name}
+                          </MobileSubItem>
+                        ))}
+                      </MobileSubMenu>
+                    </>
+                  )}
+                </div>
+              ))}
+              <div>
+                <MobileNavItem onClick={() => toggleSubmenu('Settings')}>
+                  <span>Settings</span>
+                  <span>{expandedSections['Settings'] ? '▲' : '▼'}</span>
+                </MobileNavItem>
+                <MobileSubMenu isExpanded={expandedSections['Settings']}>
+                  <MobileSubItem onClick={() => handleNavigation('/privacy-policy')}>
+                    Privacy Policy
+                  </MobileSubItem>
+                  <MobileSubItem onClick={signOutAndRedirect}>
+                    Sign Out
+                  </MobileSubItem>
+                </MobileSubMenu>
+              </div>
+            </MobileDropdownMenu>
+          </HamburgerMenu>
         </HeaderNav>
       </HeaderContainer>
     </AppHeader>
