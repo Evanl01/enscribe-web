@@ -464,6 +464,100 @@ export const checkJWTValidity = async () => {
   }
 };
 
+// Check auth with retry: validates JWT, on 401 attempts refresh, returns whether user is authenticated
+export const checkAuthWithRetry = async () => {
+  const jwt = getJWT();
+  if (!jwt) {
+    return { valid: false, requiresLogin: true, error: 'No JWT found' };
+  }
+  
+  const makeValidityRequest = async (token) => {
+    return fetch(`${API_BASE}/api/auth`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action: 'check-validity' }),
+    });
+  };
+
+  try {
+    // First attempt with current JWT
+    let response = await makeValidityRequest(jwt);
+    
+    // If unauthorized (401), try to refresh the token
+    if (response.status === 401) {
+      console.log('[Auth] JWT invalid, attempting refresh...');
+      const refreshResult = await refreshJWT();
+      
+      if (refreshResult.success) {
+        console.log('[Auth] Token refreshed successfully');
+        return { 
+          valid: true, 
+          refreshed: true,
+          data: { valid: true, message: 'Token refreshed successfully' }
+        };
+      }
+      
+      // Refresh failed, user needs to login
+      console.warn('[Auth] Token refresh failed:', refreshResult.error);
+      return { 
+        valid: false, 
+        requiresLogin: true,
+        error: `Token invalid and refresh failed: ${refreshResult.error}`,
+        refreshAttempted: true
+      };
+    }
+    
+    // Token was valid on first try
+    if (!response.ok) {
+      return { 
+        valid: false, 
+        requiresLogin: true,
+        error: `HTTP ${response.status}: ${response.statusText}`
+      };
+    }
+    
+    const data = await response.json();
+    return { valid: data.valid || false, data };
+    
+  } catch (error) {
+    return { valid: false, requiresLogin: true, error: error.message };
+  }
+};
+
+// Fetch with automatic auth validation: pre-validates JWT, refreshes if needed, then makes request
+export const fetchWithAuthValidation = async (input, init = {}) => {
+  // First, validate and refresh auth if necessary
+  const authCheck = await checkAuthWithRetry();
+  
+  if (!authCheck.valid) {
+    throw new Error(authCheck.error || 'Authentication failed. Please log in again.');
+  }
+  
+  // Auth is valid, get the current (possibly refreshed) JWT
+  const jwt = getJWT();
+  if (!jwt) {
+    throw new Error('No valid JWT available after auth check');
+  }
+  
+  // Ensure input URL has API_BASE prefix if it's a relative path starting with /api
+  const url = input.startsWith('/api') ? `${API_BASE}${input}` : input;
+  
+  // Make the actual request with validated token
+  const headers = new Headers(init.headers || {});
+  headers.set('Authorization', `Bearer ${jwt}`);
+  
+  // Set default content-type if body present and not set
+  if (init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  
+  const opts = { ...init, headers };
+  return fetch(url, opts);
+};
+
 // Fetch all dot phrases from backend
 export const getAllDotPhrases = async () => {
   const jwt = getJWT();

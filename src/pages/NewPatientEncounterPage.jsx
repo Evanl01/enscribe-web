@@ -393,6 +393,8 @@ export default function NewPatientEncounterPage() {
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
   const audioPlayerRef = useRef(null);
+  const refreshIntervalRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Audio playback state
   const [audioPlaying, setAudioPlaying] = useState(false);
@@ -609,11 +611,68 @@ export default function NewPatientEncounterPage() {
     if (!validTypes.some((type) => file.type.includes(type))) {
       return "File must be in a supported audio format (MP3, WAV, WebM, OGG, MP4, M4A)";
     }
-    if (file.size > 50 * 1024 * 1024) {
-      // 50MB
-      return "File size must be less than 50MB";
+    if (file.size > 100 * 1024 * 1024) {
+      // 100MB
+      return "File size must be less than 100MB";
     }
     return null;
+  };
+
+  // Poll for file accessibility on Supabase (verify upload is complete and accessible)
+  const pollForFileAccessibility = async (signedUrl, maxWaitMs = 5000) => {
+    console.log('[pollForFileAccessibility] Starting poll for URL accessibility:', {
+      url: signedUrl.substring(0, 50) + '...',
+      maxWaitMs
+    });
+
+    return new Promise((resolve) => {
+      let isResolved = false;
+      const startTime = Date.now();
+      const pollIntervalMs = 500;
+
+      // Wait 500ms offset before first poll to let Supabase process
+      const initialDelay = setTimeout(() => {
+        const poll = setInterval(() => {
+          const elapsedMs = Date.now() - startTime;
+
+          // Check if we've exceeded timeout
+          if (elapsedMs > maxWaitMs) {
+            console.warn('[pollForFileAccessibility] Timeout reached, stopping poll');
+            clearInterval(poll);
+            if (!isResolved) {
+              isResolved = true;
+              resolve(false); // Return false on timeout
+            }
+            return;
+          }
+
+          // Attempt to fetch file headers to verify accessibility
+          fetch(signedUrl, { method: 'HEAD' })
+            .then((response) => {
+              console.log('[pollForFileAccessibility] HEAD request returned:', {
+                status: response.status,
+                ok: response.ok,
+                elapsedMs
+              });
+
+              if (response.ok && !isResolved) {
+                isResolved = true;
+                clearInterval(poll);
+                clearTimeout(initialDelay);
+                console.log('[pollForFileAccessibility] File is accessible, stopping poll');
+                resolve(true);
+              }
+            })
+            .catch((error) => {
+              console.log('[pollForFileAccessibility] HEAD request failed (expected during polling):', {
+                error: error.message,
+                elapsedMs
+              });
+              // Continue polling on error
+            });
+        }, pollIntervalMs);
+      }, 500); // 500ms initial offset
+    });
   };
 
   // Get audio duration
@@ -786,114 +845,171 @@ export default function NewPatientEncounterPage() {
     }
   };
 
-  // Helper: attempt upload with the current client first; on failure, refresh and retry once using a temporary client
-  const uploadWithRetry = async (filePath, file) => {
-    console.log("[uploadWithRetry] attempting upload:", {
+  // Helper: validate auth upfront, then upload once with validated token (matches fetchWithAuthValidation pattern)
+  // onProgress callback receives (0-100) progress percentage, throttled at 10MB intervals
+  const uploadWithAuthValidation = async (filePath, file, onProgress) => {
+    console.log("[uploadWithAuthValidation] Starting upload:", {
       fileName: filePath.split('/').pop(),
       filePath: filePath,
       fileSize: file.size,
       fileType: file.type
     });
     
-    const jwt = api.getJWT();
-    if (!jwt) {
+    // Step 1: Pre-validate auth with automatic refresh (same pattern as fetchWithAuthValidation)
+    console.log("[uploadWithAuthValidation] Pre-validating authentication...");
+    const authCheck = await api.checkAuthWithRetry();
+    
+    if (!authCheck.valid) {
+      console.error("[uploadWithAuthValidation] Auth validation failed:", authCheck.error);
       return {
         data: null,
-        error: new Error("No JWT available"),
+        error: new Error(authCheck.error || "Authentication failed"),
+        requiresLogin: authCheck.requiresLogin,
+      };
+    }
+
+    // Step 2: Get validated JWT (already refreshed by checkAuthWithRetry if needed)
+    const jwt = api.getJWT();
+    if (!jwt) {
+      console.error("[uploadWithAuthValidation] No JWT available after auth check");
+      return {
+        data: null,
+        error: new Error("No valid JWT available after auth check"),
         requiresLogin: true,
       };
     }
 
-    // Helper to create authenticated client
-    const createAuthClientLocal = (token) =>
-      createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-        {
-          global: { headers: { Authorization: `Bearer ${token}` } },
-        }
-      );
-
-    // Helper to check if error is auth-related
-    const isAuthError = (err) => {
-      if (!err) return false;
-      const status = err.statusCode ?? err.status ?? err.status_code;
-      return (
-        status === 401 ||
-        status === 403 ||
-        /unauthorized|jwt|token|session/i.test(err.message || "")
-      );
-    };
-
     try {
-      // First attempt with current JWT
-      const client = createAuthClientLocal(jwt);
-      const result = await client.storage
-        .from("audio-files")
-        .upload(filePath, file, { upsert: false });
+      // Step 3: Upload using XMLHttpRequest with JWT auth to Supabase REST API
+      // This allows progress tracking while respecting RLS policies (JWT required for user-specific folders)
+      console.log("[uploadWithAuthValidation] Uploading file with XMLHttpRequest for progress tracking...");
+      const uploadURL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/audio-files/${filePath}`;
+      
+      const uploadXHR = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        let lastProgressUpdate = 0; // For throttling
 
-      if (!result.error) {
-        console.log("[uploadWithRetry] upload successful:", {
-          fileName: filePath.split('/').pop(),
-          filePath: filePath,
-          resultPath: result.data?.path,
-          resultId: result.data?.id
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const progress = Math.round((e.loaded / e.total) * 100);
+            
+            // Throttle progress updates at 10MB intervals
+            const bytesPerUpdate = 10 * 1024 * 1024; // 10MB
+            const currentThreshold = Math.floor(e.loaded / bytesPerUpdate) * bytesPerUpdate;
+            
+            if (currentThreshold > lastProgressUpdate || progress === 100) {
+              lastProgressUpdate = currentThreshold;
+              console.log(`[uploadWithAuthValidation] Upload progress: ${progress}%`);
+              if (onProgress) {
+                onProgress(progress);
+              }
+            }
+          }
         });
-        return { data: result.data, error: null };
-      }
 
-      // If not an auth error, fail immediately
-      if (!isAuthError(result.error)) {
-        throw result.error;
-      }
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            console.log("[uploadWithAuthValidation] Upload completed with HTTP " + xhr.status);
+            resolve({ success: true, status: xhr.status });
+          } else {
+            console.error("[uploadWithAuthValidation] Upload failed with HTTP " + xhr.status, {
+              responseText: xhr.responseText,
+              statusText: xhr.statusText
+            });
+            
+            // Handle 413 (file too large) error from REST API
+            if (xhr.status === 413) {
+              reject({
+                status: 413,
+                message: "exceeded the maximum allowed size"
+              });
+            } else {
+              reject(new Error(`Upload failed with HTTP ${xhr.status}: ${xhr.statusText}`));
+            }
+          }
+        });
 
-      // Try refreshing token and retry once
-      console.log("[uploadWithRetry] first attempt failed with auth error, retrying with refreshed token");
-      const newToken = await refreshAndGetAccessToken();
-      if (!newToken) {
+        xhr.addEventListener('error', () => {
+          console.error("[uploadWithAuthValidation] XHR network error");
+          reject(new Error("Network error during upload"));
+        });
+
+        xhr.addEventListener('abort', () => {
+          console.error("[uploadWithAuthValidation] XHR aborted");
+          reject(new Error("Upload aborted"));
+        });
+
+        // PUT file to Supabase REST API endpoint with JWT auth
+        xhr.open('PUT', uploadURL);
+        xhr.setRequestHeader('Authorization', `Bearer ${jwt}`);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
+      });
+
+      console.log("[uploadWithAuthValidation] Upload successful:", {
+        fileName: filePath.split('/').pop(),
+        filePath: filePath,
+        status: uploadXHR.status
+      });
+      
+      // Return minimal data structure to match previous interface
+      return { 
+        data: { path: filePath, id: null, fullPath: filePath }, 
+        error: null 
+      };
+    } catch (error) {
+      const status = error?.status;
+      const message = error?.message;
+      
+      console.error("[uploadWithAuthValidation] Upload failed:", {
+        message,
+        status,
+        fileName: filePath.split('/').pop(),
+      });
+
+      // Handle specific error: file too large (413)
+      if (status === 413 || message?.includes("exceeded the maximum allowed size")) {
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+        const fileTooLargeError = new Error(`File too large (${fileSizeMB}MB). Maximum allowed size is 100MB.`);
         return {
           data: null,
-          error: new Error("Session expired"),
-          requiresLogin: true,
+          error: fileTooLargeError,
+          isFileTooLarge: true,
         };
       }
 
-      const retryClient = createAuthClientLocal(newToken);
-      const retryResult = await retryClient.storage
-        .from("audio-files")
-        .upload(filePath, file, { upsert: false });
-
-      if (retryResult.error) {
-        throw retryResult.error;
-      }
-
-      console.log("[uploadWithRetry] retry upload successful:", {
-        fileName: filePath.split('/').pop(),
-        filePath: filePath,
-        resultPath: retryResult.data?.path,
-        resultId: retryResult.data?.id
-      });
-      return { data: retryResult.data, error: null };
-    } catch (error) {
+      // Re-throw other errors to be handled by caller
       throw error;
     }
   };
+  // Helper to reset file input
+  const resetFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   // Handle file upload
   const handleRecordingFileUpload = async (file) => {
     if (!file) return;
 
+    // Validate file type and size FIRST, before any async operations
     const validationError = validateFile(file);
     if (validationError) {
+      console.error('[handleRecordingFileUpload] Validation failed:', validationError);
       alert(validationError);
+      resetFileInput();
       return;
     }
 
     try {
+      // Check duration - log warning but don't block (file size is the actual constraint)
       const duration = await getAudioDuration(file);
       if (duration > 40 * 60) {
         // 40 minutes
-        alert("Recording duration must be less than 40 minutes");
-        return;
+        const durationWarning = `Recording duration (${Math.round(duration / 60)} minutes) exceeds typical 40-minute limit`;
+        console.warn('[handleRecordingFileUpload] Duration warning:', durationWarning);
+        // Proceed with upload - file size enforcement takes precedence
       }
       console.log("File metadata:", {
         name: file.name,
@@ -901,10 +1017,11 @@ export default function NewPatientEncounterPage() {
         type: file.type,
         duration,
       });
-      // Show uploading status
+      // Show uploading status with 0% progress
       setCurrentStatus({
         status: "uploading-recording",
-        message: "Uploading recording...",
+        message: "Uploading recording",
+        progress: 0,
       });
       setIsSaving(true);
 
@@ -985,9 +1102,30 @@ export default function NewPatientEncounterPage() {
       });
       const filePath = `${user?.id || "anonymous"}/${fileName}`;
 
-      // Attempt upload: try current client first, then refresh+retry once if necessary
-      // Also compare with fresh client to detect stale state issues
-      const uploadResult = await uploadWithRetry(filePath, file);
+      // Define progress callback to update UI with upload percentage
+      const onProgress = (progress) => {
+        console.log('[handleRecordingFileUpload] onProgress callback triggered:', progress);
+        setCurrentStatus(prev => {
+          const newStatus = {
+            ...prev,
+            progress: progress,
+            message: "Uploading recording",
+          };
+          console.log('[handleRecordingFileUpload] setCurrentStatus with:', newStatus);
+          return newStatus;
+        });
+      };
+
+      // Attempt upload with auth validation and progress tracking
+      console.log("[handleRecordingFileUpload] Calling uploadWithAuthValidation...");
+      const uploadResult = await uploadWithAuthValidation(filePath, file, onProgress);
+      console.log("[handleRecordingFileUpload] uploadWithAuthValidation returned:", {
+        hasError: !!uploadResult?.error,
+        hasData: !!uploadResult?.data,
+        requiresLogin: uploadResult?.requiresLogin,
+        errorMessage: uploadResult?.error?.message,
+        dataPath: uploadResult?.data?.path,
+      });
 
       setIsSaving(false);
 
@@ -1001,13 +1139,18 @@ export default function NewPatientEncounterPage() {
       const { data, error } = uploadResult;
 
       if (error || !data || !data?.path) {
+        const errorMessage = error?.message || "Upload failed";
         setCurrentStatus({
           status: "error",
-          message: error?.message || "Upload failed",
+          message: errorMessage,
         });
-        alert(
-          "Error uploading to Supabase: " + (error?.message || String(error))
-        );
+        
+        // Provide better error messaging
+        if (uploadResult?.isFileTooLarge) {
+          alert(errorMessage + "\n\nPlease record a shorter session or use a higher quality setting to reduce file size.");
+        } else {
+          alert("Error uploading recording: " + errorMessage);
+        }
         return;
       }
 
@@ -1018,13 +1161,41 @@ export default function NewPatientEncounterPage() {
       setRecordingDuration(0);
       setRecordingFileMetadata(null);
 
-      // Save enhanced metadata for later use
+      // Get signed URL for the uploaded file to enable playback
+      console.log('[handleRecordingFileUpload] Getting signed URL for playback...');
+      let signedUrl = null;
+      try {
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from('audio-files')
+          .createSignedUrl(data.path, 3600); // 1 hour expiry
+
+        if (signedError || !signedData?.signedUrl) {
+          console.warn('[handleRecordingFileUpload] Failed to get signed URL:', signedError?.message);
+        } else {
+          signedUrl = signedData.signedUrl;
+          console.log('[handleRecordingFileUpload] Got signed URL, polling for accessibility...');
+          
+          // Poll to verify file is accessible before proceeding
+          const isAccessible = await pollForFileAccessibility(signedUrl);
+          if (isAccessible) {
+            console.log('[handleRecordingFileUpload] File confirmed accessible on Supabase');
+          } else {
+            console.warn('[handleRecordingFileUpload] File accessibility poll timed out (may still work)');
+          }
+        }
+      } catch (signedUrlError) {
+        console.warn('[handleRecordingFileUpload] Error getting signed URL:', signedUrlError);
+      }
+
+      // Save enhanced metadata for later use - use upload response + our calculations
       const metadata = {
         path: data.path,
         id: data.id,
         fullPath: data.fullPath,
-        size: file.size, // <-- add file size
-        duration, // <-- add duration from getAudioDuration
+        name: fileName, // Frontend-generated filename (email-timestamp-random.ext)
+        size: file.size, // File size from upload
+        duration, // Duration calculated from getAudioDuration
+        signedUrl: signedUrl, // Signed URL for playback
       };
 
       console.log("File uploaded successfully:", metadata);
@@ -1095,6 +1266,13 @@ export default function NewPatientEncounterPage() {
   // Start recording
   // Fixed startRecording function with proper interval management
   const startRecording = async () => {
+    // Pre-flight: Validate JWT before starting recording with retry
+    const authCheck = await api.checkAuthWithRetry();
+    if (!authCheck.valid) {
+      alert("Your session has expired. Please log in again to continue recording.");
+      return;
+    }
+
     // Clear any existing interval first
     if (recordingIntervalRef.current) {
       clearInterval(recordingIntervalRef.current);
@@ -1133,10 +1311,16 @@ export default function NewPatientEncounterPage() {
       };
 
       mediaRecorder.onstop = async () => {
-        // Clear the interval when recording stops
+        // Clear the duration interval when recording stops
         if (recordingIntervalRef.current) {
           clearInterval(recordingIntervalRef.current);
           recordingIntervalRef.current = null;
+        }
+
+        // Clear the JWT refresh interval when recording stops
+        if (refreshIntervalRef.current) {
+          clearInterval(refreshIntervalRef.current);
+          refreshIntervalRef.current = null;
         }
 
         const audioBlob = new Blob(audioChunksRef.current, {
@@ -1195,10 +1379,16 @@ export default function NewPatientEncounterPage() {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
 
-      // Clear the interval
+      // Clear the duration interval
       if (recordingIntervalRef.current) {
         clearInterval(recordingIntervalRef.current);
         recordingIntervalRef.current = null;
+      }
+
+      // Clear the JWT refresh interval
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
       }
     }
 
@@ -1218,8 +1408,42 @@ export default function NewPatientEncounterPage() {
         clearInterval(recordingIntervalRef.current);
         recordingIntervalRef.current = null;
       }
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
     };
   }, []);
+
+  // In-flight JWT refresh: Periodically refresh token every 60 minutes during active recording
+  useEffect(() => {
+    if (!isRecording) {
+      return;
+    }
+
+    // Set up periodic refresh every 60 minutes (3600 seconds)
+    refreshIntervalRef.current = setInterval(async () => {
+      console.log("[Recording] In-flight JWT refresh triggered");
+      try {
+        const result = await api.refreshJWT();
+        if (result && result.success) {
+          console.log("[Recording] JWT refreshed successfully during recording");
+        } else {
+          console.warn("[Recording] JWT refresh failed:", result?.error || "Unknown error");
+        }
+      } catch (error) {
+        console.warn("[Recording] JWT refresh error:", error);
+      }
+    }, 60 * 60 * 1000); // 60 minutes in milliseconds
+
+    // Cleanup when recording stops or component unmounts
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    };
+  }, [isRecording]);
 
   // Generate SOAP note
   // Update the generateSoapNote function to handle recorded audio upload
@@ -1274,11 +1498,7 @@ export default function NewPatientEncounterPage() {
 
         // Now proceed with the API call using recording_file_path
         const payload = { recording_file_path: recording_file_path };
-        const response = await api.fetchWithRefresh("/api/prompt-llm", {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${api.getJWT()}`,
-          },
+        const response = await api.fetchWithAuthValidation("/api/prompt-llm", {
           method: "POST",
           body: JSON.stringify(payload),
         });
@@ -1581,14 +1801,10 @@ export default function NewPatientEncounterPage() {
       };
 
       console.log("Saving patient encounter with data:", payload);
-      const response = await api.fetchWithRefresh(
+      const response = await api.fetchWithAuthValidation(
         "/api/patient-encounters/complete",
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${api.getJWT()}`,
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify(payload),
           cache: "no-store", // Always fetch fresh data, never use cache
         }
@@ -1674,6 +1890,7 @@ export default function NewPatientEncounterPage() {
                   <h3 className="text-lg font-medium">Upload Audio</h3>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                     <input
+                      ref={fileInputRef}
                       type="file"
                       accept="audio/*,video/mp4,.mp4,.m4a" // Updated to include MP4 and M4A
                       onChange={handleRecordingFileInputChange}
@@ -1782,6 +1999,11 @@ export default function NewPatientEncounterPage() {
                                 ? "Recording Loaded from URL"
                                 : "Recording Ready"}
                           </p>
+                          {isLoading && currentStatus?.progress !== undefined && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              Progress: {currentStatus.progress}%
+                            </p>
+                          )}
                           <p
                             className={`text-sm ${
                               isLoading ? "text-gray-500" : "text-green-600"
@@ -1947,7 +2169,10 @@ export default function NewPatientEncounterPage() {
                   <div className="font-medium capitalize">
                     {currentStatus.status}
                   </div>
-                  <div className="text-sm">{currentStatus.message}</div>
+                  <div className="text-sm">
+                    {currentStatus.message}
+                    {currentStatus.progress !== undefined && currentStatus.progress !== null ? ` – ${currentStatus.progress}%` : ""}
+                  </div>
                 </div>
               )}
 

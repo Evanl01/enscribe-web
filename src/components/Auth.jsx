@@ -2,29 +2,25 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import * as api from "@/lib/api";
 
-// Directly define checkAuthAndRedirect here
+// Check auth with retry: validates JWT, attempts refresh on 401, then logs out if needed
 async function checkAuthAndRedirect(navigate) {
-  const jwt = api.getJWT();
-  if (!jwt) {
-    api.deleteJWT();
-    navigate("/login");
-    return;
-  }
-  
   try {
-    const result = await api.checkJWTValidity();
+    const result = await api.checkAuthWithRetry();
     
-    if (!result.valid) {
-      console.error("<Auth/>: JWT validation failed:", result.error || result.data);
-      api.deleteJWT();
-      navigate("/login");
+    if (result.valid) {
+      console.log("<Auth/>: Authentication successful", result.refreshed ? "(after refresh)" : "");
       return;
     }
     
-    console.log("<Auth/>: JWT is valid:", result.data);
+    console.error("<Auth/>: Authentication failed:", result.error);
+    if (result.requiresLogin) {
+      // Sign out to revoke server-side session and clear tokens
+      await api.handleSignOut();
+      navigate("/login");
+    }
   } catch (err) {
-    console.error("<Auth/>: Error during JWT validation:", err);
-    api.deleteJWT();
+    console.error("<Auth/>: Unexpected error during auth check:", err);
+    await api.handleSignOut();
     navigate("/login");
   }
 }
