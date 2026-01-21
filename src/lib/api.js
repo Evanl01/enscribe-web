@@ -1,6 +1,20 @@
 // lib/api.js - API-related functions
 export const API_BASE = import.meta.env.VITE_API_URL || '';
 
+// Global mutex lock for preventing concurrent JWT refresh attempts
+let refreshPromise = null;
+
+// Acquire mutex lock for JWT refresh - ensures only one refresh happens at a time
+// Multiple concurrent callers will wait for the first refresh to complete
+const acquireRefreshLock = async () => {
+  while (refreshPromise) {
+    await refreshPromise;
+  }
+  let releaseLock;
+  refreshPromise = new Promise(resolve => { releaseLock = resolve; });
+  return releaseLock;
+};
+
 // Helper to get JWT from localStorage (client-side only)
 export const getJWT = () => {
   if (typeof window === 'undefined') return null;
@@ -465,6 +479,7 @@ export const checkJWTValidity = async () => {
 };
 
 // Check auth with retry: validates JWT, on 401 attempts refresh, returns whether user is authenticated
+// Uses mutex lock to prevent concurrent refresh attempts when multiple requests fail auth simultaneously
 export const checkAuthWithRetry = async () => {
   const jwt = getJWT();
   if (!jwt) {
@@ -486,28 +501,50 @@ export const checkAuthWithRetry = async () => {
     // First attempt with current JWT
     let response = await makeValidityRequest(jwt);
     
-    // If unauthorized (401), try to refresh the token
+    // If unauthorized (401), try to refresh the token (with mutex lock to prevent race conditions)
     if (response.status === 401) {
       console.log('[Auth] JWT invalid, attempting refresh...');
-      const refreshResult = await refreshJWT();
       
-      if (refreshResult.success) {
-        console.log('[Auth] Token refreshed successfully');
+      // Acquire lock to ensure only one refresh happens at a time
+      const releaseLock = await acquireRefreshLock();
+      
+      try {
+        // After acquiring lock, check token validity again with possibly-refreshed token
+        const currentJwt = getJWT();
+        if (currentJwt !== jwt) {
+          // Token was already refreshed by another request while we waited for lock
+          console.log('[Auth] Token was already refreshed by concurrent request');
+          return { 
+            valid: true, 
+            refreshed: false,
+            data: { valid: true, message: 'Token already refreshed by concurrent request' }
+          };
+        }
+        
+        // Token is still the same, proceed with refresh
+        const refreshResult = await refreshJWT();
+        
+        if (refreshResult.success) {
+          console.log('[Auth] Token refreshed successfully');
+          return { 
+            valid: true, 
+            refreshed: true,
+            data: { valid: true, message: 'Token refreshed successfully' }
+          };
+        }
+        
+        // Refresh failed, user needs to login
+        console.warn('[Auth] Token refresh failed:', refreshResult.error);
         return { 
-          valid: true, 
-          refreshed: true,
-          data: { valid: true, message: 'Token refreshed successfully' }
+          valid: false, 
+          requiresLogin: true,
+          error: `Token invalid and refresh failed: ${refreshResult.error}`,
+          refreshAttempted: true
         };
+      } finally {
+        // Always release lock
+        releaseLock();
       }
-      
-      // Refresh failed, user needs to login
-      console.warn('[Auth] Token refresh failed:', refreshResult.error);
-      return { 
-        valid: false, 
-        requiresLogin: true,
-        error: `Token invalid and refresh failed: ${refreshResult.error}`,
-        refreshAttempted: true
-      };
     }
     
     // Token was valid on first try

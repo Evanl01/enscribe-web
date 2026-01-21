@@ -12,6 +12,8 @@ export default function ViewRecordingsPage() {
   const [unattachedRecordings, setUnattachedRecordings] = useState([]);
   const [attachedSortBy, setAttachedSortBy] = useState("name");
   const [unattachedSortBy, setUnattachedSortBy] = useState("name");
+  const [attachedOrder, setAttachedOrder] = useState("asc");
+  const [unattachedOrder, setUnattachedOrder] = useState("asc");
   // Active tab: 'attached' or 'unattached'
   const [activeTab, setActiveTab] = useState("attached");
   const [loading, setLoading] = useState(true);
@@ -19,8 +21,12 @@ export default function ViewRecordingsPage() {
   const [recordingData, setRecordingData] = useState(null);
   const [loadingRecording, setLoadingRecording] = useState(false);
   const [deletingRecording, setDeletingRecording] = useState(false);
+  const [selectedAttachedIds, setSelectedAttachedIds] = useState(new Set());
+  const [selectedUnattachedPaths, setSelectedUnattachedPaths] = useState(new Set());
+  const [hoveredRecordingId, setHoveredRecordingId] = useState(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  const fetchRecordings = useCallback(async (attached, sortBy = "name") => {
+  const fetchRecordings = useCallback(async (attached, sortBy = "name", order = "asc") => {
     const jwt = api.getJWT();
     if (!jwt) {
       navigate("/login");
@@ -33,7 +39,7 @@ export default function ViewRecordingsPage() {
         limit: 100,
         offset: 0,
         sortBy,
-        order: 'asc'
+        order
       });
       return data;
     } catch (error) {
@@ -45,17 +51,17 @@ export default function ViewRecordingsPage() {
     }
   }, [navigate]);
 
-  const loadAllRecordings = useCallback(async (attachedSort = attachedSortBy, unattachedSort = unattachedSortBy) => {
+  const loadAllRecordings = useCallback(async (attachedSort = attachedSortBy, unattachedSort = unattachedSortBy, attachedOrd = attachedOrder, unattachedOrd = unattachedOrder) => {
     setLoading(true);
     const [attached, unattached] = await Promise.all([
-      fetchRecordings(true, attachedSort),
-      fetchRecordings(false, unattachedSort)
+      fetchRecordings(true, attachedSort, attachedOrd),
+      fetchRecordings(false, unattachedSort, unattachedOrd)
     ]);
     
     setAttachedRecordings(attached);
     setUnattachedRecordings(unattached);
     setLoading(false);
-  }, [attachedSortBy, unattachedSortBy, fetchRecordings, setLoading, setAttachedRecordings, setUnattachedRecordings]);
+  }, [attachedSortBy, unattachedSortBy, attachedOrder, unattachedOrder, fetchRecordings, setLoading, setAttachedRecordings, setUnattachedRecordings]);
 
   useEffect(() => {
     loadAllRecordings();
@@ -63,12 +69,24 @@ export default function ViewRecordingsPage() {
 
   const handleAttachedSortChange = (newSort) => {
     setAttachedSortBy(newSort);
-    loadAllRecordings(newSort, unattachedSortBy);
+    loadAllRecordings(newSort, unattachedSortBy, attachedOrder, unattachedOrder);
+  };
+
+  const handleAttachedOrderToggle = () => {
+    const newOrder = attachedOrder === "asc" ? "desc" : "asc";
+    setAttachedOrder(newOrder);
+    loadAllRecordings(attachedSortBy, unattachedSortBy, newOrder, unattachedOrder);
   };
 
   const handleUnattachedSortChange = (newSort) => {
     setUnattachedSortBy(newSort);
-    loadAllRecordings(attachedSortBy, newSort);
+    loadAllRecordings(attachedSortBy, newSort, attachedOrder, unattachedOrder);
+  };
+
+  const handleUnattachedOrderToggle = () => {
+    const newOrder = unattachedOrder === "asc" ? "desc" : "asc";
+    setUnattachedOrder(newOrder);
+    loadAllRecordings(attachedSortBy, unattachedSortBy, attachedOrder, newOrder);
   };
 
   const getRecordingName = (path) => {
@@ -210,14 +228,157 @@ export default function ViewRecordingsPage() {
     }
   };
 
-  const RecordingCard = ({ recording, isAttached }) => (
+  const getTotalSelectedCount = () => {
+    return selectedAttachedIds.size + selectedUnattachedPaths.size;
+  };
+
+  const getAttachedSelectedCount = () => {
+    return selectedAttachedIds.size;
+  };
+
+  const getUnattachedSelectedCount = () => {
+    return selectedUnattachedPaths.size;
+  };
+
+  const isRecordingSelected = (identifier, isAttached) => {
+    return isAttached
+      ? selectedAttachedIds.has(identifier)
+      : selectedUnattachedPaths.has(identifier);
+  };
+
+  const shouldShowCheckbox = (recordingId, isAttached) => {
+    const totalSelected = getTotalSelectedCount();
+    const isSelected = isRecordingSelected(recordingId, isAttached);
+    const isHovered = hoveredRecordingId === recordingId;
+    return isSelected || (totalSelected === 0 && isHovered);
+  };
+
+  const handleToggleRecordingSelection = (identifier, isAttached) => {
+    if (isAttached) {
+      setSelectedAttachedIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(identifier)) {
+          newSet.delete(identifier);
+        } else {
+          newSet.add(identifier);
+        }
+        return newSet;
+      });
+    } else {
+      setSelectedUnattachedPaths(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(identifier)) {
+          newSet.delete(identifier);
+        } else {
+          newSet.add(identifier);
+        }
+        return newSet;
+      });
+    }
+  };
+
+  const handleToggleSelectAll = (isAttached) => {
+    if (isAttached) {
+      if (selectedAttachedIds.size === attachedRecordings.length) {
+        setSelectedAttachedIds(new Set());
+      } else {
+        setSelectedAttachedIds(new Set(attachedRecordings.map(r => r.id)));
+      }
+    } else {
+      if (selectedUnattachedPaths.size === unattachedRecordings.length) {
+        setSelectedUnattachedPaths(new Set());
+      } else {
+        setSelectedUnattachedPaths(new Set(unattachedRecordings.map(r => r.path)));
+      }
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const totalSelected = getTotalSelectedCount();
+    if (totalSelected === 0) return;
+
+    const confirmMessage = `Are you sure you want to delete ${totalSelected} recording(s)?\\n\\nWarning: Some of these may be attached to Patient Encounters, which will also be deleted.`;
+    if (!confirm(confirmMessage)) return;
+
+    setBulkDeleting(true);
+    const jwt = api.getJWT();
+    if (!jwt) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Delete attached recordings
+      for (const id of selectedAttachedIds) {
+        try {
+          // TODO: Implement DELETE endpoint for /api/patient-encounters/complete
+          console.log('Would delete patient encounter:', id);
+          // For now, just skip attached ones since endpoint doesn't exist
+          errorCount++;
+        } catch (error) {
+          console.error('Error deleting attached recording:', error);
+          errorCount++;
+        }
+      }
+
+      // Delete unattached recordings
+      const supabase = getSupabaseClient(`Bearer ${jwt}`);
+      const pathsToDelete = Array.from(selectedUnattachedPaths);
+
+      if (pathsToDelete.length > 0) {
+        const { error } = await supabase.storage
+          .from('audio-files')
+          .remove(pathsToDelete);
+
+        if (error) {
+          console.error('Storage delete error:', error);
+          errorCount += pathsToDelete.length;
+        } else {
+          successCount += pathsToDelete.length;
+          // Update local state
+          setUnattachedRecordings(prev =>
+            prev.filter(r => !selectedUnattachedPaths.has(r.path))
+          );
+        }
+      }
+
+      // Clear selections
+      setSelectedAttachedIds(new Set());
+      setSelectedUnattachedPaths(new Set());
+
+      // Show result message
+      if (successCount > 0 && errorCount === 0) {
+        alert(`Successfully deleted ${successCount} recording(s).`);
+      } else if (errorCount > 0 && successCount === 0) {
+        alert(`Failed to delete ${errorCount} recording(s). Please try again.`);
+      } else if (successCount > 0 && errorCount > 0) {
+        alert(`Deleted ${successCount} recording(s), but ${errorCount} failed.`);
+      }
+    } catch (error) {
+      console.error('Error during bulk delete:', error);
+      alert('An error occurred during bulk delete. Please try again.');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const RecordingCard = ({ recording, isAttached }) => {
+    const recordingIdentifier = isAttached ? recording.id : recording.path;
+    const totalSelected = getTotalSelectedCount();
+    const isSelected = isRecordingSelected(recordingIdentifier, isAttached);
+    const showCheckbox = shouldShowCheckbox(recordingIdentifier, isAttached);
+
+    return (
     <div
       className="recording-card"
       data-recording-path={recording.path}
       data-patient-encounter-id={isAttached ? recording.patientEncounter?.id : undefined}
       key={recording.path}
       style={{
-        background: "#fff",
+        background: isSelected ? "#f0f9ff" : "#fff",
         borderRadius: "12px",
         boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
         padding: "20px",
@@ -225,20 +386,44 @@ export default function ViewRecordingsPage() {
         width: "100%",
         display: "flex",
         flexDirection: "column",
-        transition: "box-shadow 0.2s, transform 0.2s",
+        transition: "box-shadow 0.2s, transform 0.2s, background-color 0.2s",
         cursor: "pointer",
-        border: recording.missing ? "2px solid #ef4444" : "none",
+        border: isSelected ? "2px solid #2563eb" : recording.missing ? "2px solid #ef4444" : "1px solid #e5e7eb",
+        position: "relative",
       }}
       onMouseEnter={(e) => {
+        setHoveredRecordingId(recordingIdentifier);
         e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.16)";
         e.currentTarget.style.transform = "translateY(-4px) scale(1.03)";
       }}
       onMouseLeave={(e) => {
+        setHoveredRecordingId(null);
         e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
         e.currentTarget.style.transform = "none";
       }}
       onClick={() => handleCardClick(recording)}
     >
+      {showCheckbox && (
+        <input
+          type="checkbox"
+          className="recording-checkbox"
+          checked={isSelected}
+          onChange={(e) => {
+            e.stopPropagation();
+            handleToggleRecordingSelection(recordingIdentifier, isAttached);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            top: "12px",
+            right: "12px",
+            width: "20px",
+            height: "20px",
+            cursor: "pointer",
+            zIndex: "10",
+          }}
+        />
+      )}
       <div
         className="recording-icon"
         style={{ fontSize: "2rem", marginBottom: "8px" }}
@@ -302,7 +487,8 @@ export default function ViewRecordingsPage() {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <>
@@ -343,8 +529,44 @@ export default function ViewRecordingsPage() {
         {/* Attached recordings tab content */}
         {!loading && activeTab === 'attached' && (
           <div className="tab-content" style={{ display: activeTab === 'attached' ? 'block' : 'none' }}>
+            {/* Bulk delete toolbar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <input
+                  type="checkbox"
+                  className="recording-checkbox"
+                  checked={selectedAttachedIds.size === attachedRecordings.length && attachedRecordings.length > 0}
+                  onChange={() => handleToggleSelectAll(true)}
+                  title="Select all attached recordings"
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+                {getAttachedSelectedCount() === 0 ? (
+                  <span style={{ fontSize: '14px', color: '#374151', fontWeight: '500' }}>Select All</span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: '14px', color: '#1e40af', fontWeight: '500' }}>
+                      {getAttachedSelectedCount()} selected
+                    </span>
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={bulkDeleting}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: bulkDeleting ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        opacity: bulkDeleting ? 0.6 : 1,
+                      }}
+                    >
+                      {bulkDeleting ? 'Deleting...' : `Delete ${getAttachedSelectedCount()} recording${getAttachedSelectedCount() !== 1 ? 's' : ''}`}
+                    </button>
+                  </>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <label htmlFor="attachedSortBy" className="text-sm font-medium text-gray-700">Sort by</label>
                 <select
@@ -357,6 +579,14 @@ export default function ViewRecordingsPage() {
                   <option value="created_at">Date Created</option>
                   <option value="updated_at">Date Updated</option>
                 </select>
+                <button
+                  onClick={handleAttachedOrderToggle}
+                  className="p-1 hover:bg-gray-200 rounded transition-colors"
+                  title={attachedOrder === "asc" ? "Ascending" : "Descending"}
+                  style={{ fontSize: '18px', lineHeight: '1', cursor: 'pointer' }}
+                >
+                  {attachedOrder === "asc" ? "↑" : "↓"}
+                </button>
               </div>
             </div>
             <div className="responsive-grid" id="attachedRecordings" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '20px', width: '100%', margin: '0 auto' }}>
@@ -390,7 +620,42 @@ export default function ViewRecordingsPage() {
               ⚠️ These recordings have not been linked to a patient encounter. Please review and attach them, otherwise they will be removed per our data retention policy.
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <input
+                  type="checkbox"
+                  className="recording-checkbox"
+                  checked={selectedUnattachedPaths.size === unattachedRecordings.length && unattachedRecordings.length > 0}
+                  onChange={() => handleToggleSelectAll(false)}
+                  title="Select all unattached recordings"
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+                {getUnattachedSelectedCount() === 0 ? (
+                  <span style={{ fontSize: '14px', color: '#374151', fontWeight: '500' }}>Select All</span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: '14px', color: '#1e40af', fontWeight: '500' }}>
+                      {getUnattachedSelectedCount()} selected
+                    </span>
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={bulkDeleting}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: bulkDeleting ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        opacity: bulkDeleting ? 0.6 : 1,
+                      }}
+                    >
+                      {bulkDeleting ? 'Deleting...' : `Delete ${getUnattachedSelectedCount()} recording${getUnattachedSelectedCount() !== 1 ? 's' : ''}`}
+                    </button>
+                  </>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <label htmlFor="unattachedSortBy" className="text-sm font-medium text-gray-700">Sort by</label>
                 <select
@@ -403,6 +668,14 @@ export default function ViewRecordingsPage() {
                   <option value="created_at">Date Created</option>
                   <option value="updated_at">Date Updated</option>
                 </select>
+                <button
+                  onClick={handleUnattachedOrderToggle}
+                  className="p-1 hover:bg-gray-200 rounded transition-colors"
+                  title={unattachedOrder === "asc" ? "Ascending" : "Descending"}
+                  style={{ fontSize: '18px', lineHeight: '1', cursor: 'pointer' }}
+                >
+                  {unattachedOrder === "asc" ? "↑" : "↓"}
+                </button>
               </div>
             </div>
             <div className="responsive-grid" id="unattachedRecordings" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '20px', width: '100%', margin: '0 auto' }}>
