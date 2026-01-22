@@ -11,7 +11,12 @@ const acquireRefreshLock = async () => {
     await refreshPromise;
   }
   let releaseLock;
-  refreshPromise = new Promise(resolve => { releaseLock = resolve; });
+  refreshPromise = new Promise(resolve => {
+    releaseLock = () => {
+      refreshPromise = null;  // Clear the promise so next caller doesn't wait forever
+      resolve();
+    };
+  });
   return releaseLock;
 };
 
@@ -389,8 +394,11 @@ export const checkRefreshCookie = async () => {
   }
 };
 
-// Centralized JWT refresh function
+// Centralized JWT refresh function with mutex lock
+// Ensures only one refresh happens at a time, protecting against race conditions
 export const refreshJWT = async () => {
+  const releaseLock = await acquireRefreshLock();
+  
   try {
     const refreshResponse = await fetch(`${API_BASE}/api/auth/refresh`, { 
       method: 'POST', 
@@ -413,6 +421,8 @@ export const refreshJWT = async () => {
     return { success: true, token: newToken };
   } catch (error) {
     return { success: false, error: error.message };
+  } finally {
+    releaseLock();
   }
 };
 
@@ -479,7 +489,7 @@ export const checkJWTValidity = async () => {
 };
 
 // Check auth with retry: validates JWT, on 401 attempts refresh, returns whether user is authenticated
-// Uses mutex lock to prevent concurrent refresh attempts when multiple requests fail auth simultaneously
+// Lock is handled internally by refreshJWT() - no need for explicit locking here
 export const checkAuthWithRetry = async () => {
   const jwt = getJWT();
   if (!jwt) {
@@ -501,50 +511,28 @@ export const checkAuthWithRetry = async () => {
     // First attempt with current JWT
     let response = await makeValidityRequest(jwt);
     
-    // If unauthorized (401), try to refresh the token (with mutex lock to prevent race conditions)
+    // If unauthorized (401), try to refresh the token
     if (response.status === 401) {
       console.log('[Auth] JWT invalid, attempting refresh...');
+      const refreshResult = await refreshJWT();
       
-      // Acquire lock to ensure only one refresh happens at a time
-      const releaseLock = await acquireRefreshLock();
-      
-      try {
-        // After acquiring lock, check token validity again with possibly-refreshed token
-        const currentJwt = getJWT();
-        if (currentJwt !== jwt) {
-          // Token was already refreshed by another request while we waited for lock
-          console.log('[Auth] Token was already refreshed by concurrent request');
-          return { 
-            valid: true, 
-            refreshed: false,
-            data: { valid: true, message: 'Token already refreshed by concurrent request' }
-          };
-        }
-        
-        // Token is still the same, proceed with refresh
-        const refreshResult = await refreshJWT();
-        
-        if (refreshResult.success) {
-          console.log('[Auth] Token refreshed successfully');
-          return { 
-            valid: true, 
-            refreshed: true,
-            data: { valid: true, message: 'Token refreshed successfully' }
-          };
-        }
-        
-        // Refresh failed, user needs to login
-        console.warn('[Auth] Token refresh failed:', refreshResult.error);
+      if (refreshResult.success) {
+        console.log('[Auth] Token refreshed successfully');
         return { 
-          valid: false, 
-          requiresLogin: true,
-          error: `Token invalid and refresh failed: ${refreshResult.error}`,
-          refreshAttempted: true
+          valid: true, 
+          refreshed: true,
+          data: { valid: true, message: 'Token refreshed successfully' }
         };
-      } finally {
-        // Always release lock
-        releaseLock();
       }
+      
+      // Refresh failed, user needs to login
+      console.warn('[Auth] Token refresh failed:', refreshResult.error);
+      return { 
+        valid: false, 
+        requiresLogin: true,
+        error: `Token invalid and refresh failed: ${refreshResult.error}`,
+        refreshAttempted: true
+      };
     }
     
     // Token was valid on first try
