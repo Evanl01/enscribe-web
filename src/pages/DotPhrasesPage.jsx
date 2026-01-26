@@ -18,70 +18,88 @@ export default function DotPhrasesPage() {
       navigate("/login");
       return;
     }
-    try {
-      setError(null);
-      const data = await api.getAllDotPhrases();
-      setDotPhrases(data);
-    } catch (error) {
+    setError(null);
+    const result = await api.getAllDotPhrases();
+    if (!result.success) {
       // Only logout on 401 (authentication error)
-      if (error.status === 401) {
+      if (result.status === 401) {
         navigate("/login");
       } else {
         // Show user-friendly error for other failures (404, 500, etc)
-        setError(`Failed to load dot phrases: ${error.message}`);
+        setError(`Failed to load dot phrases: ${result.error}`);
         setDotPhrases([]);
       }
+      return;
     }
+    setDotPhrases(result.data);
   }, [navigate]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       fetchDotPhrases().catch(console.error);
     }, 0);
-    
+
     return () => clearTimeout(timeoutId);
   }, [fetchDotPhrases]);
 
   const handleEditClick = (dotPhrase) => {
     setSelectedRowId(dotPhrase.id);
-    setEditValues({ trigger: dotPhrase.trigger, expansion: dotPhrase.expansion });
+    setEditValues({
+      trigger: dotPhrase.trigger,
+      expansion: dotPhrase.expansion,
+    });
     setIsCreatingNew(false);
   };
 
   const handleDeleteClick = async (dotPhrase) => {
-    if (confirm(`Are you sure you want to delete the dot phrase "${dotPhrase.trigger}"?`)) {
-      try {
-        await api.deleteDotPhrase(dotPhrase.id);
-        window.location.reload();
-      } catch (error) {
-        if (error.status === 401) {
+    if (
+      confirm(
+        `Are you sure you want to delete the dot phrase "${dotPhrase.trigger}"?`,
+      )
+    ) {
+      const result = await api.deleteDotPhrase(dotPhrase.id);
+      if (!result.success) {
+        if (result.status === 401) {
           navigate("/login");
         } else {
-          setError(`Delete failed: ${error.message}`);
+          setError(`Delete failed: ${result.error}`);
         }
+        return;
       }
+      window.location.reload();
     }
   };
 
   const handleSave = async () => {
-    try {
-      if (isCreatingNew) {
-        await api.createDotPhrase({ 
-          trigger: editValues.trigger, 
-          expansion: editValues.expansion 
-        });
-      } else {
-        await api.updateDotPhrase(selectedRowId, { 
-          trigger: editValues.trigger, 
-          expansion: editValues.expansion 
-        });
+    if (isCreatingNew) {
+      const result = await api.createDotPhrase({
+        trigger: editValues.trigger,
+        expansion: editValues.expansion,
+      });
+      if (!result.success) {
+        if (result.status === 401) {
+          navigate("/login");
+        } else {
+          setError(`Save failed: ${result.error}`);
+        }
+        return;
       }
-      window.location.reload();
-    } catch (error) {
-      if (error.status === 401) {
-        navigate("/login");
+      else {
+        window.location.reload();
+      }
+    } else {
+      const result = await api.updateDotPhrase(selectedRowId, {
+        trigger: editValues.trigger,
+        expansion: editValues.expansion,
+      });
+      if (!result.success) {
+        if (result.status === 401) {
+          navigate("/login");
+        } else {
+          setError(`Save failed: ${result.error}`);
+        }
       } else {
-        setError(`Save failed: ${error.message}`);
+        window.location.reload();
       }
     }
   };
@@ -101,7 +119,9 @@ export default function DotPhrasesPage() {
 
   const truncateText = (text, maxLength = 50) => {
     if (!text) return "";
-    return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+    return text.length > maxLength
+      ? text.substring(0, maxLength) + "..."
+      : text;
   };
 
   return (
@@ -139,7 +159,9 @@ export default function DotPhrasesPage() {
         <div className="bg-white border border-gray-200 rounded-b-lg">
           {dotPhrases.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              {error ? "Unable to load dot phrases" : "No dot phrases found. Create your first one below!"}
+              {error
+                ? "Unable to load dot phrases"
+                : "No dot phrases found. Create your first one below!"}
             </div>
           ) : (
             dotPhrases.map((dotPhrase) => (

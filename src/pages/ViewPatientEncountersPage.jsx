@@ -16,12 +16,16 @@ const ViewPatientEncountersPage = () => {
         navigate("/login")
         return
       }
-      try {
-        const data = await api.getAllPatientEncounters()
-        setPatientEncounters(Object.values(data))
-      } catch (error) {
-        navigate("/login")
+      const result = await api.getAllPatientEncounters()
+      if (!result.success) {
+        if (result.status === 401) {
+          navigate("/login")
+        } else {
+          console.error('Error loading patient encounters:', result.error)
+        }
+        return
       }
+      setPatientEncounters(Object.values(result.data))
     }
     fetchEncounters()
   }, [navigate])

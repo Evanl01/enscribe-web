@@ -78,7 +78,15 @@ function EditPatientEncounterPage() {
     if (!id) return;
     const fetchData = async () => {
       try {
-        const data = await api.getPatientEncounterComplete(id);
+        const result = await api.getPatientEncounterComplete(id);
+        
+        if (!result.success) {
+          if (result.status === 401) {
+            navigate("/login");
+          }
+          throw new Error(result.error);
+        }
+        const data = result.data;
 
         console.log("Fetched patient encounter data:", data);
         // Fill in all fields from API response
@@ -199,25 +207,32 @@ function EditPatientEncounterPage() {
     //   name: previewPatientEncounterName,
     //   transcript_text: transcript,
     // });
-    try {
-      const result = await api.updatePatientEncounterAndTranscript(id, {
-        name: previewPatientEncounterName,
-        transcript_text: transcript,
-      });
-      console.log("Patient encounter saved successfully:", result);
-      setPatientEncounterName(previewPatientEncounterName);
+    const result = await api.updatePatientEncounterAndTranscript(id, {
+      name: previewPatientEncounterName,
+      transcript_text: transcript,
+    });
+
+    if (!result.success) {
+      console.error("Error saving patient encounter:", result.error);
+      if (result.status === 401) {
+        navigate("/login");
+        return;
+      }
+      alert("Error saving data: " + result.error);
       setIsSaving(false);
-      setOpenSections((prev) => ({
-        ...prev,
-        editSoapNote: false, // Close section 4 before reload
-      }));
-      setEditingSoapNote(null);
-      setSelectedSoapNoteId(null);
-      window.location.reload();
-    } catch (error) {
-      alert("Error saving data: " + error.message);
-      setIsSaving(false);
+      return;
     }
+
+    console.log("Patient encounter saved successfully:", result.data);
+    setPatientEncounterName(previewPatientEncounterName);
+    setIsSaving(false);
+    setOpenSections((prev) => ({
+      ...prev,
+      editSoapNote: false, // Close section 4 before reload
+    }));
+    setEditingSoapNote(null);
+    setSelectedSoapNoteId(null);
+    window.location.reload();
   };
   const saveSoapNote_BillingSuggestion = async (id) => {
     setIsSaving(true);
@@ -242,12 +257,21 @@ function EditPatientEncounterPage() {
         assessment: soapAssessment.replace(/\r?\n/g, "\n"),
         plan: soapPlan.replace(/\r?\n/g, "\n"),
       };
-      await api.patchSoapNote(id, {
+      const result = await api.patchSoapNote(id, {
         soapNote_text: {
           soapNote: soapNoteObject,
           billingSuggestion,
         },
       });
+      if (!result.success) {
+        if (result.status === 401) {
+          navigate("/login");
+        } else {
+          alert("Error saving data: " + result.error);
+        }
+        setIsSaving(false);
+        return;
+      }
       setIsSaving(false);
       window.location.reload();
     } catch (error) {

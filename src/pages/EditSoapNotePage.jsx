@@ -42,8 +42,14 @@ export default function EditSoapNotePage() {
     const fetchData = async () => {
       try {
         // 1. Fetch soapNote by id
-        let data = await api.getSoapNoteById(soapNoteId);
-        data = parseSoapNotes(data);
+        const result = await api.getSoapNoteById(soapNoteId);
+        if (!result.success) {
+          if (result.status === 401) {
+            navigate("/login");
+          }
+          throw new Error(result.error);
+        }
+        let data = parseSoapNotes(result.data);
         if (!data) throw new Error("SOAP note not found");
 
         // 2. Set SOAP note fields
@@ -67,8 +73,14 @@ export default function EditSoapNotePage() {
           throw new Error("Associated Patient Encounter not found");
         
         setPatientEncounterId(patientEncounterId);
-        const patientEncounterDataRaw = await api.getPatientEncounterComplete(patientEncounterId);
-        const patientEncounterData = patientEncounterDataRaw.patientEncounter;
+        const patientEncounterResult = await api.getPatientEncounterComplete(patientEncounterId);
+        if (!patientEncounterResult.success) {
+          if (patientEncounterResult.status === 401) {
+            navigate("/login");
+          }
+          throw new Error(patientEncounterResult.error);
+        }
+        const patientEncounterData = patientEncounterResult.data.patientEncounter;
         setPatientEncounterName(patientEncounterData.name || "");
       } catch (error) {
         console.error("Error fetching SOAP note or patient encounter:", error);
@@ -179,7 +191,16 @@ export default function EditSoapNotePage() {
       };
       console.log("Saving SOAP note:", payload);
       
-      await api.patchSoapNote(soapNoteId, payload);
+      const result = await api.patchSoapNote(soapNoteId, payload);
+      if (!result.success) {
+        if (result.status === 401) {
+          navigate("/login");
+        } else {
+          alert("Error saving data: " + result.error);
+        }
+        setIsSaving(false);
+        return;
+      }
       setIsSaving(false);
       window.location.reload();
     } catch (error) {

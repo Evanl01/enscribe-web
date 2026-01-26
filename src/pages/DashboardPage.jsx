@@ -30,21 +30,22 @@ const DashboardPage = () => {
 
   // Load patient encounters
   const loadPatientEncounters = useCallback(async () => {
-    try {
-      const data = await api.getAllPatientEncounters()
-      setPatientEncounters(data)
-      setPatientEncountersCount(Object.keys(data).length)
-      const recent = Object.values(data).slice(0, 5)
-      setRecentPatientEncounters(recent)
-      return data
-    } catch (error) {
-      console.error('Error loading patient encounters:', error)
-      if (error.message?.includes('401') || error.message?.includes('not logged in')) {
+    const result = await api.getAllPatientEncounters()
+    if (!result.success) {
+      console.error('Error loading patient encounters:', result.error)
+      if (result.status === 401) {
         navigate('/login')
       } else {
-        setError('Error loading patient encounters: ' + (error.message || error))
+        setError('Error loading patient encounters: ' + result.error)
       }
+      return
     }
+    const data = result.data
+    setPatientEncounters(data)
+    setPatientEncountersCount(Object.keys(data).length)
+    const recent = Object.values(data).slice(0, 5)
+    setRecentPatientEncounters(recent)
+    return data
   }, [navigate])
 
   // Load SOAP notes
@@ -55,22 +56,24 @@ const DashboardPage = () => {
       return
     }
 
-    try {
-      const data = await api.getAllSoapNotes()
-      const parsedSoapNotes = parseSoapNotes(data)
-      setSoapNotes(parsedSoapNotes)
-      setSoapNotesCount(Object.keys(parsedSoapNotes).length)
-      const recent = Object.values(parsedSoapNotes).slice(0, 5)
-      setRecentSoapNotes(recent)
-      return data
-    } catch (error) {
-      console.error('Error loading SOAP notes:', error)
-      if (error.message?.includes('401') || error.message?.includes('not logged in')) {
+    const result = await api.getAllSoapNotes()
+    if (!result.success) {
+      console.error('Error loading SOAP notes:', result.error)
+      if (result.status === 401) {
         navigate('/login')
       } else {
-        setError('Error loading SOAP notes: ' + (error.message || error))
+        setError('Error loading SOAP notes: ' + result.error)
       }
+      return
     }
+
+    const data = result.data
+    const parsedSoapNotes = parseSoapNotes(data)
+    setSoapNotes(parsedSoapNotes)
+    setSoapNotesCount(Object.keys(parsedSoapNotes).length)
+    const recent = Object.values(parsedSoapNotes).slice(0, 5)
+    setRecentSoapNotes(recent)
+    return data
   }, [navigate])
 
   // Load all data on mount

@@ -6,18 +6,11 @@ import * as ui from "@/utils/ui.js";
 import * as format from "@/utils/format.js";
 import * as validation from "@/utils/validation.js";
 import * as background from "@/utils/background.js";
-import { createClient } from "@supabase/supabase-js";
-import { createAuthClient } from "@/utils/supabase.js";
 import PatientEncounterPreviewOverlay from "@/components/PatientEncounterPreviewOverlay";
 import { record, set } from "zod";
 import ExportDataAsFileMenu from "@/components/ExportDataAsFileMenu.jsx";
 import Auth from "@/components/Auth.jsx";
 import CopyToClipboard from "@/components/CopyToClipboard.jsx";
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
 
 export default function NewPatientEncounterPage() {
   const navigate = useNavigate();
@@ -131,31 +124,42 @@ export default function NewPatientEncounterPage() {
       
       setLoadingUrlRecording(true);
       try {
-        const jwt = api.getJWT();
-        if (!jwt) {
-          throw new Error("User not authenticated");
-        }
+        // Create signed URL for the recording using api singleton
+        const result = await api.fetchWithRefreshRetry('/api/recordings/create-signed-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: urlRecordingPath }),
+        });
 
-        // Create signed URL for the recording using authenticated client
-        const authClient = createAuthClient(jwt);
-        const { data, error } = await authClient.storage
-          .from("audio-files")
-          .createSignedUrl(urlRecordingPath, 60 * 60); // 1 hour expiry
-
-        if (error || !data?.signedUrl) {
-          console.error('Error creating signed URL for URL recording:', error);
+        if (!result.success) {
+          console.error('Error creating signed URL for URL recording:', result.error);
           alert('Failed to load recording from URL. Please try again or upload the file manually.');
           setLoadingUrlRecording(false);
           return;
         }
 
+        const response = result.response;
+        if (!response.ok) {
+          console.error('Error creating signed URL for URL recording:', response.statusText);
+          alert('Failed to load recording from URL. Please try again or upload the file manually.');
+          setLoadingUrlRecording(false);
+          return;
+        }
+
+        const signedUrlData = await response.json();
+        if (!signedUrlData?.signedUrl) {
+          console.error('Error creating signed URL for URL recording: no signedUrl in response');
+          alert('Failed to load recording from URL. Please try again or upload the file manually.');
+          setLoadingUrlRecording(false);
+          return;
+        }
         // Extract filename from path
         const fileName = urlRecordingPath.split("/").pop() || "recording";
         
         // Create metadata object similar to upload flow
         const metadata = {
           path: urlRecordingPath,
-          signedUrl: data.signedUrl,
+          signedUrl: signedUrlData.signedUrl,
           name: fileName,
           // Note: size and duration not available from URL, but path is most important
           fromUrl: true // Flag to indicate this came from URL
@@ -411,12 +415,64 @@ export default function NewPatientEncounterPage() {
     try {
       const metadata = JSON.parse(metadataStr);
 
-      // Get a signed URL from Supabase
-      const { data, error } = await supabase.storage
-        .from("audio-files")
-        .createSignedUrl(metadata.path, 60 * 60); // 1 hour expiry
+      // Get a signed URL from backend using refresh-retry auth
+      try {
+        console.log("localStorage Metadata:", metadata);
+        console.log("[getLocalStorageRecordingFile] Fetching signed URL for stored recording:", metadata.path);
+        const result = await api.fetchWithRefreshRetry('/api/recordings/create-signed-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: metadata.path }),
+        });
 
-      if (error || !data?.signedUrl) {
+        if (!result.success) {
+          console.warn("Error creating signed URL for stored recording:", result.error);
+          // Return metadata without signed URL
+          return {
+            ...metadata,
+            signedUrl: null,
+            name:
+              metadata.path && typeof metadata.path === "string"
+                ? metadata.path.split("/")[metadata.path.split("/").length - 1]
+                : "recording.webm",
+          };
+        }
+
+        const response = result.response;
+        if (!response.ok) {
+          console.warn("Error creating signed URL for stored recording:", response.statusText);
+          // Return metadata without signed URL
+          return {
+            ...metadata,
+            signedUrl: null,
+            name:
+              metadata.path && typeof metadata.path === "string"
+                ? metadata.path.split("/")[metadata.path.split("/").length - 1]
+                : "recording.webm",
+          };
+        }
+
+        const signedUrlData = await response.json();
+        console.log(
+          "[getLocalStorageRecordingFile]: recordingFileMetadata:",
+          metadata,
+          "signedUrl:",
+          signedUrlData.signedUrl,
+          "isuploading:",
+          isUploading
+        );
+        return {
+          ...metadata,
+          signedUrl: signedUrlData.signedUrl,
+          name:
+            metadata.path && typeof metadata.path === "string"
+              ? metadata.path.split("/")[metadata.path.split("/").length - 1]
+              : "recording.webm",
+          // size and duration are now included from stored metadata
+        };
+      } catch (error) {
+        console.error("Error creating signed URL for stored recording:", error);
+        // Return metadata without signed URL
         return {
           ...metadata,
           signedUrl: null,
@@ -426,23 +482,6 @@ export default function NewPatientEncounterPage() {
               : "recording.webm",
         };
       }
-      console.log(
-        "[getLocalStorageRecordingFile]: recordingFileMetadata:",
-        metadata,
-        "signedUrl:",
-        data.signedUrl,
-        "isuploading:",
-        isUploading
-      );
-      return {
-        ...metadata,
-        signedUrl: data.signedUrl,
-        name:
-          metadata.path && typeof metadata.path === "string"
-            ? metadata.path.split("/")[metadata.path.split("/").length - 1]
-            : "recording.webm",
-        // size and duration are now included from stored metadata
-      };
     } catch (e) {
       console.error("Error parsing recording file metadata:", e);
       return null;
@@ -792,10 +831,8 @@ export default function NewPatientEncounterPage() {
   // Helper function to clear all auth-related storage when sessions get corrupted
   const clearAllAuthState = async () => {
     try {
-      // Clear Supabase sessions
-      await supabase.auth.signOut();
-
-      // Clear localStorage entries
+      // Supabase sessions are now managed by singleton in api.js
+      // Just clear localStorage and sessionStorage entries
       Object.keys(localStorage).forEach((key) => {
         if (
           key.includes("supabase") ||
@@ -844,131 +881,40 @@ export default function NewPatientEncounterPage() {
       return null;
     }
   };
-
-  // Helper: validate auth upfront, then upload once with validated token (matches fetchWithAuthValidation pattern)
-  // onProgress callback receives (0-100) progress percentage, throttled at 10MB intervals
-  const uploadWithAuthValidation = async (filePath, file, onProgress) => {
-    console.log("[uploadWithAuthValidation] Starting upload:", {
-      fileName: filePath.split('/').pop(),
-      filePath: filePath,
-      fileSize: file.size,
-      fileType: file.type
-    });
-    
-    // Step 1: Pre-validate auth with automatic refresh (same pattern as fetchWithAuthValidation)
-    console.log("[uploadWithAuthValidation] Pre-validating authentication...");
-    const authCheck = await api.checkAuthWithRetry();
-    
-    if (!authCheck.valid) {
-      console.error("[uploadWithAuthValidation] Auth validation failed:", authCheck.error);
-      return {
-        data: null,
-        error: new Error(authCheck.error || "Authentication failed"),
-        requiresLogin: authCheck.requiresLogin,
-      };
-    }
-
-    // Step 2: Get validated JWT (already refreshed by checkAuthWithRetry if needed)
-    const jwt = api.getJWT();
-    if (!jwt) {
-      console.error("[uploadWithAuthValidation] No JWT available after auth check");
-      return {
-        data: null,
-        error: new Error("No valid JWT available after auth check"),
-        requiresLogin: true,
-      };
-    }
-
+  // Wrapper around two-step upload process: get signed URL + XHR upload
+  const uploadWithReactiveAuth = async (filePath, file, onProgress) => {
     try {
-      // Step 3: Upload using XMLHttpRequest with JWT auth to Supabase REST API
-      // This allows progress tracking while respecting RLS policies (JWT required for user-specific folders)
-      console.log("[uploadWithAuthValidation] Uploading file with XMLHttpRequest for progress tracking...");
-      const uploadURL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/audio-files/${filePath}`;
-      
-      const uploadXHR = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        let lastProgressUpdate = 0; // For throttling
-
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            const progress = Math.round((e.loaded / e.total) * 100);
-            
-            // Throttle progress updates at 10MB intervals
-            const bytesPerUpdate = 10 * 1024 * 1024; // 10MB
-            const currentThreshold = Math.floor(e.loaded / bytesPerUpdate) * bytesPerUpdate;
-            
-            if (currentThreshold > lastProgressUpdate || progress === 100) {
-              lastProgressUpdate = currentThreshold;
-              console.log(`[uploadWithAuthValidation] Upload progress: ${progress}%`);
-              if (onProgress) {
-                onProgress(progress);
-              }
-            }
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            console.log("[uploadWithAuthValidation] Upload completed with HTTP " + xhr.status);
-            resolve({ success: true, status: xhr.status });
-          } else {
-            console.error("[uploadWithAuthValidation] Upload failed with HTTP " + xhr.status, {
-              responseText: xhr.responseText,
-              statusText: xhr.statusText
-            });
-            
-            // Handle 413 (file too large) error from REST API
-            if (xhr.status === 413) {
-              reject({
-                status: 413,
-                message: "exceeded the maximum allowed size"
-              });
-            } else {
-              reject(new Error(`Upload failed with HTTP ${xhr.status}: ${xhr.statusText}`));
-            }
-          }
-        });
-
-        xhr.addEventListener('error', () => {
-          console.error("[uploadWithAuthValidation] XHR network error");
-          reject(new Error("Network error during upload"));
-        });
-
-        xhr.addEventListener('abort', () => {
-          console.error("[uploadWithAuthValidation] XHR aborted");
-          reject(new Error("Upload aborted"));
-        });
-
-        // PUT file to Supabase REST API endpoint with JWT auth
-        xhr.open('PUT', uploadURL);
-        xhr.setRequestHeader('Authorization', `Bearer ${jwt}`);
-        xhr.setRequestHeader('Content-Type', file.type);
-        xhr.send(file);
-      });
-
-      console.log("[uploadWithAuthValidation] Upload successful:", {
-        fileName: filePath.split('/').pop(),
-        filePath: filePath,
-        status: uploadXHR.status
+      // Step 1: Get signed URL from backend using Tier 3 (refresh-retry) auth
+      console.log('[uploadWithReactiveAuth] Step 1: Fetching signed URL...');
+      const result = await api.fetchWithRefreshRetry('/api/recordings/create-signed-upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: filePath }),
       });
       
-      // Return minimal data structure to match previous interface
-      return { 
-        data: { path: filePath, id: null, fullPath: filePath }, 
-        error: null 
-      };
+      if (!result.success) {
+        throw new Error(`Failed to get signed URL: ${result.error}`);
+      }
+      
+      const signedUrlResponse = result.response;
+      if (!signedUrlResponse.ok) {
+        const errorData = await signedUrlResponse.json().catch(() => ({}));
+        throw new Error(`Failed to get signed URL: ${errorData.message || signedUrlResponse.statusText}`);
+      }
+      
+      const { signedUrl, path } = await signedUrlResponse.json();
+      console.log('[uploadWithReactiveAuth] Step 1 complete, got signed URL');
+      
+      // Step 2: Upload file to signed URL using XHR with progress tracking
+      console.log('[uploadWithReactiveAuth] Step 2: Uploading to signed URL via XHR...');
+      await api.xhrUploadToSignedUrl(signedUrl, file, onProgress);
+      console.log('[uploadWithReactiveAuth] Step 2 complete, upload successful');
+      
+      return { data: { path, id: filePath }, error: null };
     } catch (error) {
-      const status = error?.status;
-      const message = error?.message;
-      
-      console.error("[uploadWithAuthValidation] Upload failed:", {
-        message,
-        status,
-        fileName: filePath.split('/').pop(),
-      });
-
       // Handle specific error: file too large (413)
-      if (status === 413 || message?.includes("exceeded the maximum allowed size")) {
+      const message = error?.message;
+      if (message?.includes("exceeded the maximum allowed size") || message?.includes("File too large")) {
         const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
         const fileTooLargeError = new Error(`File too large (${fileSizeMB}MB). Maximum allowed size is 100MB.`);
         return {
@@ -977,9 +923,12 @@ export default function NewPatientEncounterPage() {
           isFileTooLarge: true,
         };
       }
-
-      // Re-throw other errors to be handled by caller
-      throw error;
+      // Return error structure for other errors
+      return {
+        data: null,
+        error: error,
+        requiresLogin: error?.message?.includes("not authenticated"),
+      };
     }
   };
   // Helper to reset file input
@@ -1108,7 +1057,7 @@ export default function NewPatientEncounterPage() {
         setCurrentStatus(prev => {
           const newStatus = {
             ...prev,
-            progress: progress,
+            progress: progress.percent || 0,
             message: "Uploading recording",
           };
           console.log('[handleRecordingFileUpload] setCurrentStatus with:', newStatus);
@@ -1117,9 +1066,9 @@ export default function NewPatientEncounterPage() {
       };
 
       // Attempt upload with auth validation and progress tracking
-      console.log("[handleRecordingFileUpload] Calling uploadWithAuthValidation...");
-      const uploadResult = await uploadWithAuthValidation(filePath, file, onProgress);
-      console.log("[handleRecordingFileUpload] uploadWithAuthValidation returned:", {
+      console.log("[handleRecordingFileUpload] Calling uploadWithReactiveAuth (Tier 2)...");
+      const uploadResult = await uploadWithReactiveAuth(filePath, file, onProgress);
+      console.log("[handleRecordingFileUpload] uploadWithReactiveAuth returned:", {
         hasError: !!uploadResult?.error,
         hasData: !!uploadResult?.data,
         requiresLogin: uploadResult?.requiresLogin,
@@ -1137,6 +1086,12 @@ export default function NewPatientEncounterPage() {
       }
 
       const { data, error } = uploadResult;
+
+      console.log('[handleRecordingFileUpload] uploadResult.data:', {
+        path: data?.path,
+        id: data?.id,
+        fullPath: data?.fullPath,
+      });
 
       if (error || !data || !data?.path) {
         const errorMessage = error?.message || "Upload failed";
@@ -1165,22 +1120,31 @@ export default function NewPatientEncounterPage() {
       console.log('[handleRecordingFileUpload] Getting signed URL for playback...');
       let signedUrl = null;
       try {
-        const { data: signedData, error: signedError } = await supabase.storage
-          .from('audio-files')
-          .createSignedUrl(data.path, 3600); // 1 hour expiry
+        const result = await api.fetchWithRefreshRetry('/api/recordings/create-signed-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: data.path }),
+        });
 
-        if (signedError || !signedData?.signedUrl) {
-          console.warn('[handleRecordingFileUpload] Failed to get signed URL:', signedError?.message);
+        if (!result.success) {
+          console.warn('[handleRecordingFileUpload] Failed to get signed URL:', result.error);
         } else {
-          signedUrl = signedData.signedUrl;
-          console.log('[handleRecordingFileUpload] Got signed URL, polling for accessibility...');
-          
-          // Poll to verify file is accessible before proceeding
-          const isAccessible = await pollForFileAccessibility(signedUrl);
-          if (isAccessible) {
-            console.log('[handleRecordingFileUpload] File confirmed accessible on Supabase');
+          const response = result.response;
+          if (!response.ok) {
+            console.warn('[handleRecordingFileUpload] Failed to get signed URL:', response.statusText);
           } else {
-            console.warn('[handleRecordingFileUpload] File accessibility poll timed out (may still work)');
+            const signedUrlData = await response.json();
+            console.log('[handleRecordingFileUpload] Received signed URL data:', signedUrlData);
+            signedUrl = signedUrlData.signedUrl;
+            console.log('[handleRecordingFileUpload] Got signed URL, polling for accessibility...');
+            
+            // Poll to verify file is accessible before proceeding
+            const isAccessible = await pollForFileAccessibility(signedUrl);
+            if (isAccessible) {
+              console.log('[handleRecordingFileUpload] File confirmed accessible');
+            } else {
+              console.warn('[handleRecordingFileUpload] File accessibility poll timed out (may still work)');
+            }
           }
         }
       } catch (signedUrlError) {
@@ -1198,14 +1162,25 @@ export default function NewPatientEncounterPage() {
         signedUrl: signedUrl, // Signed URL for playback
       };
 
-      console.log("File uploaded successfully:", metadata);
+      console.log("File uploaded successfully - metadata being saved:", {
+        metadataPath: metadata.path,
+        pathLength: metadata.path?.length,
+        pathParts: metadata.path?.split('/'),
+      });
 
       // Store with new key name
       localStorage.setItem(
         LS_KEYS.recordingFileMetadata,
         JSON.stringify(metadata)
       );
-      // console.log("LS recording file metadata saved:", { ...localStorage });
+      
+      // Verify what was actually saved
+      const savedMetadata = JSON.parse(localStorage.getItem(LS_KEYS.recordingFileMetadata));
+      console.log("Metadata saved to localStorage - verification:", {
+        savedPath: savedMetadata?.path,
+        pathLength: savedMetadata?.path?.length,
+        pathParts: savedMetadata?.path?.split('/'),
+      });
 
       // Update local state
       setRecordingFile(file);
@@ -1266,8 +1241,8 @@ export default function NewPatientEncounterPage() {
   // Start recording
   // Fixed startRecording function with proper interval management
   const startRecording = async () => {
-    // Pre-flight: Validate JWT before starting recording with retry
-    const authCheck = await api.checkAuthWithRetry();
+    // Pre-flight: Validate JWT before starting recording with refresh retry
+    const authCheck = await api.checkAuthWithRefreshRetry();
     if (!authCheck.valid) {
       alert("Your session has expired. Please log in again to continue recording.");
       return;
@@ -1425,7 +1400,7 @@ export default function NewPatientEncounterPage() {
     refreshIntervalRef.current = setInterval(async () => {
       console.log("[Recording] In-flight JWT refresh triggered");
       try {
-        const result = await api.refreshJWT();
+        const result = await api.refreshSession();
         if (result && result.success) {
           console.log("[Recording] JWT refreshed successfully during recording");
         } else {
@@ -1498,11 +1473,23 @@ export default function NewPatientEncounterPage() {
 
         // Now proceed with the API call using recording_file_path
         const payload = { recording_file_path: recording_file_path };
-        const response = await api.fetchWithAuthValidation("/api/prompt-llm", {
+        console.log('[promptLLM] Calling LLM API with fetchWithRefreshRetry (Tier 3)...');
+        const apiResult = await api.fetchWithRefreshRetry("/api/prompt-llm", {
           method: "POST",
           body: JSON.stringify(payload),
         });
 
+        if (!apiResult.success) {
+          setIsProcessing(false);
+          const errorMessage = `Authentication failed: ${apiResult.error}`;
+          setCurrentStatus({
+            status: "error",
+            message: errorMessage,
+          });
+          throw new Error(errorMessage);
+        }
+
+        const response = apiResult.response;
         if (!response.ok) {
           setIsProcessing(false);
 
@@ -1801,7 +1788,8 @@ export default function NewPatientEncounterPage() {
       };
 
       console.log("Saving patient encounter with data:", payload);
-      const response = await api.fetchWithAuthValidation(
+      console.log('[savePatientEncounter] Calling API with fetchWithRefreshRetry (Tier 3)...');
+      const apiResult = await api.fetchWithRefreshRetry(
         "/api/patient-encounters/complete",
         {
           method: "POST",
@@ -1809,6 +1797,16 @@ export default function NewPatientEncounterPage() {
           cache: "no-store", // Always fetch fresh data, never use cache
         }
       );
+
+      if (!apiResult.success) {
+        const errorMessage = `Authentication failed: ${apiResult.error}`;
+        console.error(errorMessage);
+        alert(errorMessage);
+        setIsSaving(false);
+        return;
+      }
+
+      const response = apiResult.response;
       console.log("Save response:", response);
 
       if (!response.ok) {

@@ -17,18 +17,23 @@ export default function ViewSoapNotesPage() {
         navigate("/login");
         return;
       }
-      try {
-        const data = await api.getAllSoapNotes();
-        if (!data || Object.keys(data).length === 0) {
+      const result = await api.getAllSoapNotes();
+      if (!result.success) {
+        if (result.status === 401) {
           navigate("/login");
-          return;
+        } else {
+          console.error('Error loading SOAP notes:', result.error);
         }
-        const parsedSoapNotes = parseSoapNotes(data);
-        setSoapNotes(parsedSoapNotes);
-        console.log("Fetched SOAP notes:", parsedSoapNotes);
-      } catch (error) {
-        navigate("/login");
+        return;
       }
+      const data = result.data;
+      if (!data || Object.keys(data).length === 0) {
+        navigate("/login");
+        return;
+      }
+      const parsedSoapNotes = parseSoapNotes(data);
+      setSoapNotes(parsedSoapNotes);
+      console.log("Fetched SOAP notes:", parsedSoapNotes);
     };
     fetchSoapNotes();
   }, [navigate]);

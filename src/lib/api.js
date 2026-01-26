@@ -1,10 +1,11 @@
 // lib/api.js - API-related functions
+
 export const API_BASE = import.meta.env.VITE_API_URL || '';
 
-// Global mutex lock for preventing concurrent JWT refresh attempts
+// Global mutex lock for preventing concurrent session refresh attempts
 let refreshPromise = null;
 
-// Acquire mutex lock for JWT refresh - ensures only one refresh happens at a time
+// Acquire mutex lock for session refresh - ensures only one refresh happens at a time
 // Multiple concurrent callers will wait for the first refresh to complete
 const acquireRefreshLock = async () => {
   while (refreshPromise) {
@@ -52,13 +53,13 @@ export const signIn = async (email, password) => {
     }
 
     const body = await resp.json().catch(() => ({}));
-    
+
     // Server may return token as a plain string or as an object { access_token }
     const jwt =
       typeof body?.token === 'string'
         ? body.token
         : body?.access_token || body?.token?.access_token || body?.token?.accessToken || null;
-    
+
     if (!jwt) {
       throw new Error('No access token returned from server sign-in');
     }
@@ -66,10 +67,10 @@ export const signIn = async (email, password) => {
     // Store JWT and user email
     setJWT(jwt);
     localStorage.setItem('userEmail', email);
-    
+
     // Post message for any listeners
     window.postMessage({ type: 'EMSCRIBE_LOGIN', jwt, userEmail: email }, '*');
-    
+
     return { success: true, jwt, email };
   } catch (error) {
     return { success: false, error: error.message };
@@ -108,14 +109,14 @@ export const resendConfirmationEmail = async (email) => {
 
     // Always return success for security (avoid email enumeration)
     // The server should handle the actual logic and return neutral responses
-    return { 
-      success: true, 
-      message: 'If an account exists for that email, a confirmation email was sent. Check your inbox and spam.' 
+    return {
+      success: true,
+      message: 'If an account exists for that email, a confirmation email was sent. Check your inbox and spam.'
     };
   } catch (error) {
-    return { 
-      success: false, 
-      error: 'Unable to send confirmation now — please try again later.' 
+    return {
+      success: false,
+      error: 'Unable to send confirmation now — please try again later.'
     };
   }
 };
@@ -180,7 +181,7 @@ export const handleSignOut = async ({ redirectTo } = {}) => {
 export const fetchWithRefresh = async (input, init = {}) => {
   // Ensure input URL has API_BASE prefix if it's a relative path starting with /api
   const url = input.startsWith('/api') ? `${API_BASE}${input}` : input;
-  
+
   const makeRequest = async (token) => {
     const headers = new Headers(init.headers || {});
     if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -196,11 +197,11 @@ export const fetchWithRefresh = async (input, init = {}) => {
   if (resp.status !== 401) return resp;
 
   // try refresh endpoint once
-  const refreshResult = await refreshJWT();
+  const refreshResult = await refreshSession();
   if (!refreshResult.success) {
     return resp; // return original 401 response if refresh fails
   }
-  
+
   // retry with new token
   try {
     resp = await makeRequest(refreshResult.token);
@@ -211,171 +212,130 @@ export const fetchWithRefresh = async (input, init = {}) => {
 };
 
 // Fetch all transcripts from backend
+// Returns: { success: true, data: object } or { success: false, error: string }
 export const getAllTranscripts = async () => {
-  const jwt = getJWT();
-  try {
-    const res = await fetch(`${API_BASE}/api/transcripts`, {
-      headers: { 'Authorization': `Bearer ${jwt}` }
-    });
-
-    if (!res.ok) {
-      console.error('Failed to fetch transcripts:', res.status, res.statusText);
-      return {};
-    }
-
-    return await res.json();
-  } catch (error) {
-    console.error('Error fetching transcripts:', error);
-    return {};
+  const result = await fetchWithRefreshRetry('/api/transcripts', {
+    method: 'GET',
+  });
+  if (!result.success) {
+    return result;
   }
+
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Fetch all SOAP notes from backend
+// Returns: { success: true, data: object } or { success: false, error: string }
+// Fetch all SOAP notes from backend
+// Returns: { success: true, data: object } or { success: false, error: string, status?: number }
 export const getAllSoapNotes = async () => {
-  const jwt = getJWT();
-  try {
-    const res = await fetch(`${API_BASE}/api/soap-notes`, {
-      headers: { 'Authorization': `Bearer ${jwt}` }
-    });
-
-    if (!res.ok) {
-      console.error('Failed to fetch SOAP notes:', res.status, res.statusText);
-      return {};
-    }
-
-    return await res.json();
-  } catch (error) {
-    console.error('Error fetching SOAP notes:', error);
-    return {};
+  const result = await fetchWithRefreshRetry('/api/soap-notes', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!result.success) {
+    return result;
   }
+
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Fetch single SOAP note by ID
+// Returns: { success: true, data: object } or { success: false, error: string, status?: number }
 export const getSoapNoteById = async (id) => {
-  const jwt = getJWT();
-  if (!jwt) {
-    throw new Error('User not logged in');
+  const result = await fetchWithRefreshRetry(`/api/soap-notes/${id}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+  if (!result.success) {
+    return result;
   }
 
-  try {
-    const response = await fetch(`${API_BASE}/api/soap-notes/${id}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Failed to fetch SOAP note: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching SOAP note:', error);
-    throw error;
-  }
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
+// Fetch single patient encounter by ID
+// Returns: { success: true, data: object } or { success: false, error: string, status?: number }
+export const getPatientEncounterById = async (id) => {
+  const result = await fetchWithRefreshRetry(`/api/patient-encounters/${id}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  if (!result.success) {
+    return result;
+  }
+
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
+};
 // Fetch all patient encounters from backend
+// Returns: { success: true, data: object } or { success: false, error: string, status?: number }
 export const getAllPatientEncounters = async () => {
-  const jwt = getJWT();
-  if (!jwt) {
-    throw new Error('User not logged in');
+  const result = await fetchWithRefreshRetry('/api/patient-encounters', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+  if (!result.success) {
+    return result;
   }
 
-  try {
-    const response = await fetch(`${API_BASE}/api/patient-encounters`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching patient encounters:', error);
-    throw error;
-  }
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Fetch complete patient encounter data (encounter + transcript + soap notes + recording)
+// Returns: { success: true, data: object } or { success: false, error: string, status?: number }
 export const getPatientEncounterComplete = async (id) => {
-  const jwt = getJWT();
-  if (!jwt) {
-    throw new Error('User not logged in');
+  const result = await fetchWithRefreshRetry(`/api/patient-encounters/complete/${id}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+  if (!result.success) {
+    return result;
   }
 
-  try {
-    const response = await fetch(`${API_BASE}/api/patient-encounters/complete/${id}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Failed to fetch patient encounter: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching complete patient encounter:', error);
-    throw error;
-  }
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Update patient encounter (name and transcript)
+// Returns: { success: true, data: object, status?: number } or { success: false, error: string, status?: number }
 export const updatePatientEncounterAndTranscript = async (id, { name, transcript_text }) => {
-  const jwt = getJWT();
-  if (!jwt) {
-    throw new Error('User not logged in');
+  const result = await fetchWithRefreshRetry(`/api/patient-encounters/${id}/update-with-transcript`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name,
+      transcript_text,
+    }),
+  });
+
+  if (!result.success) {
+    return result;
   }
 
-  try {
-    const response = await fetch(`${API_BASE}/api/patient-encounters/${id}/update-with-transcript`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name,
-        transcript_text,
-      }),
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      let detailedError = `Failed to save patient encounter: ${response.status} ${response.statusText}`;
-      try {
-        const errorText = await response.text();
-        if (errorText) {
-          detailedError += `\nServer response: ${errorText}`;
-        }
-      } catch (e) {
-        // ignore error parsing response
-      }
-      throw new Error(detailedError);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error updating patient encounter:', error);
-    throw error;
-  }
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 export const checkRefreshCookie = async () => {
@@ -394,28 +354,30 @@ export const checkRefreshCookie = async () => {
   }
 };
 
-// Centralized JWT refresh function with mutex lock
+// Centralized session refresh function with mutex lock
+// Rotates refresh token (httpOnly cookie) and returns fresh access token (JWT)
 // Ensures only one refresh happens at a time, protecting against race conditions
-export const refreshJWT = async () => {
+export const refreshSession = async () => {
   const releaseLock = await acquireRefreshLock();
-  
+
   try {
-    const refreshResponse = await fetch(`${API_BASE}/api/auth/refresh`, { 
-      method: 'POST', 
-      credentials: 'include' 
+    const refreshResponse = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include'
     });
-    
+
     if (!refreshResponse.ok) {
-      return { success: false, error: `Refresh failed: ${refreshResponse.status} ${refreshResponse.statusText}` };
+      const errorData = await refreshResponse.json().catch(() => ({}));
+      return { success: false, error: errorData?.error || `Refresh failed: ${refreshResponse.status}` };
     }
-    
+
     const refreshData = await refreshResponse.json();
-    const newToken = refreshData?.accessToken || refreshData?.token || null;
-    
+    const newToken = refreshData?.accessToken || null;
+
     if (!newToken) {
       return { success: false, error: 'No token returned from refresh' };
     }
-    
+
     // Store the new token
     setJWT(newToken);
     return { success: true, token: newToken };
@@ -432,7 +394,7 @@ export const checkJWTValidity = async () => {
   if (!jwt) {
     return { valid: false, error: 'No JWT found' };
   }
-  
+
   const makeValidityRequest = async (token) => {
     return fetch(`${API_BASE}/api/auth`, {
       method: 'POST',
@@ -447,106 +409,86 @@ export const checkJWTValidity = async () => {
   try {
     // First attempt with current JWT
     let response = await makeValidityRequest(jwt);
-    
+
     // If unauthorized (401), try to refresh the token
     if (response.status === 401) {
       console.log('JWT invalid, attempting refresh...');
-      const refreshResult = await refreshJWT();
-      
+      const refreshResult = await refreshSession();
+
       if (refreshResult.success) {
         // No need to re-check validity - refresh success means token is valid
         console.log('Token refreshed successfully');
-        return { 
-          valid: true, 
+        return {
+          valid: true,
           refreshed: true,
           data: { valid: true, message: 'Token refreshed successfully' }
         };
       }
-      
+
       // Refresh failed, return original error with refresh attempt info
       console.warn('Token refresh failed:', refreshResult.error);
-      return { 
-        valid: false, 
+      return {
+        valid: false,
         error: `Token invalid and refresh failed: ${refreshResult.error}`,
         refreshAttempted: true
       };
     }
-    
+
     // Token was valid on first try
     if (!response.ok) {
-      return { 
-        valid: false, 
+      return {
+        valid: false,
         error: `HTTP ${response.status}: ${response.statusText}`
       };
     }
-    
+
     const data = await response.json();
     return { valid: data.valid || false, data };
-    
+
   } catch (error) {
     return { valid: false, error: error.message };
   }
 };
 
-// Check auth with retry: validates JWT, on 401 attempts refresh, returns whether user is authenticated
-// Lock is handled internally by refreshJWT() - no need for explicit locking here
-export const checkAuthWithRetry = async () => {
+// Check auth with refresh retry: validates JWT via fetchWithRefreshRetry (Tier 3)
+// On 401: automatically refreshes token and retries
+// Returns: { valid: boolean, data?: object, requiresLogin?: boolean, error?: string, status?: number }
+export const checkAuthWithRefreshRetry = async () => {
   const jwt = getJWT();
   if (!jwt) {
     return { valid: false, requiresLogin: true, error: 'No JWT found' };
   }
-  
-  const makeValidityRequest = async (token) => {
-    return fetch(`${API_BASE}/api/auth`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ action: 'check-validity' }),
-    });
-  };
 
   try {
-    // First attempt with current JWT
-    let response = await makeValidityRequest(jwt);
-    
-    // If unauthorized (401), try to refresh the token
-    if (response.status === 401) {
-      console.log('[Auth] JWT invalid, attempting refresh...');
-      const refreshResult = await refreshJWT();
-      
-      if (refreshResult.success) {
-        console.log('[Auth] Token refreshed successfully');
-        return { 
-          valid: true, 
-          refreshed: true,
-          data: { valid: true, message: 'Token refreshed successfully' }
-        };
-      }
-      
-      // Refresh failed, user needs to login
-      console.warn('[Auth] Token refresh failed:', refreshResult.error);
-      return { 
-        valid: false, 
+    // Use Tier 3 (fetchWithRefreshRetry): try request, on 401 refresh & retry
+    const result = await fetchWithRefreshRetry('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'check-validity' }),
+    });
+
+    if (!result.success) {
+      return {
+        valid: false,
         requiresLogin: true,
-        error: `Token invalid and refresh failed: ${refreshResult.error}`,
-        refreshAttempted: true
+        error: result.error,
+        status: result.status
       };
     }
-    
-    // Token was valid on first try
-    if (!response.ok) {
-      return { 
-        valid: false, 
+
+    const resp = result.response;
+    if (!resp.ok) {
+      return {
+        valid: false,
         requiresLogin: true,
-        error: `HTTP ${response.status}: ${response.statusText}`
+        error: `HTTP ${resp.status}: ${resp.statusText}`,
+        status: resp.status
       };
     }
-    
-    const data = await response.json();
+
+    const data = await resp.json();
     return { valid: data.valid || false, data };
-    
+
   } catch (error) {
     return { valid: false, requiresLogin: true, error: error.message };
   }
@@ -555,330 +497,339 @@ export const checkAuthWithRetry = async () => {
 // Fetch with automatic auth validation: pre-validates JWT, refreshes if needed, then makes request
 export const fetchWithAuthValidation = async (input, init = {}) => {
   // First, validate and refresh auth if necessary
-  const authCheck = await checkAuthWithRetry();
-  
+  const authCheck = await checkAuthWithRefreshRetry();
+
   if (!authCheck.valid) {
     throw new Error(authCheck.error || 'Authentication failed. Please log in again.');
   }
-  
+
   // Auth is valid, get the current (possibly refreshed) JWT
   const jwt = getJWT();
   if (!jwt) {
     throw new Error('No valid JWT available after auth check');
   }
-  
+
   // Ensure input URL has API_BASE prefix if it's a relative path starting with /api
   const url = input.startsWith('/api') ? `${API_BASE}${input}` : input;
-  
+
   // Make the actual request with validated token
   const headers = new Headers(init.headers || {});
   headers.set('Authorization', `Bearer ${jwt}`);
-  
+
   // Set default content-type if body present and not set
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
-  
+
   const opts = { ...init, headers };
   return fetch(url, opts);
 };
 
-// Fetch all dot phrases from backend
-export const getAllDotPhrases = async () => {
-  const jwt = getJWT();
-  if (!jwt) {
-    throw new Error('User not logged in');
-  }
-
+// Helper: Decode JWT locally to extract expiry without async call
+const getJWTExpiry = (token) => {
   try {
-    const response = await fetch(`${API_BASE}/api/dot-phrases`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
+    const payload = token.split('.')[1];
+    const decoded = JSON.parse(atob(payload));
+    const expiryMs = decoded.exp * 1000; // Convert to milliseconds
+    const timeLeft = expiryMs - Date.now();
+    console.log('[getJWTExpiry] Token expiry decoded:', {
+      expiryTime: new Date(expiryMs).toISOString(),
+      timeLeftMs: timeLeft,
+      isExpired: Date.now() >= expiryMs,
     });
+    return expiryMs;
+  } catch (error) {
+    console.error('[getJWTExpiry] Failed to decode JWT:', error);
+    return null; // Invalid token
+  }
+};
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const error = new Error(errorData.message || `HTTP ${response.status}`);
-      error.status = response.status;
-      throw error;
+/**
+ * Tier 3: Simple fetch with 401 refresh-retry (lightweight alternative)
+ * Use for: Lightweight data fetches where proactive checks aren't needed
+ * Minimizes: Complexity, only refreshes on actual 401
+ * Returns: { success: true, response, status } or { success: false, error, status? }
+ */
+export const fetchWithRefreshRetry = async (url, options = {}) => {
+  try {
+    // Normalize URL
+    const normalizedUrl = url.startsWith('/api') ? `${API_BASE}${url}` : url;
+
+    // Step 1: Initial fetch attempt
+    const jwt = getJWT();
+    const headers = new Headers(options.headers || {});
+    if (jwt) headers.set('Authorization', `Bearer ${jwt}`);
+    if (options.body && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
     }
 
-    return await response.json();
+    let response = await fetch(normalizedUrl, {
+      ...options,
+      headers,
+    });
+
+    // Step 1 result: non-401 error or success
+    if (response.status !== 401) {
+      if (!response.ok) {
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          status: response.status,
+        };
+      }
+      return { success: true, response, status: response.status };
+    }
+
+    // Step 2a: 401 received, attempt refresh
+    const refreshResult = await refreshSession();
+
+    if (!refreshResult.success) {
+      return {
+        success: false,
+        error: refreshResult.error,
+        status: 401,
+      };
+    }
+
+    // Step 3: Refresh successful, retry fetch
+    const newHeaders = new Headers(options.headers || {});
+    newHeaders.set('Authorization', `Bearer ${refreshResult.token}`);
+    if (options.body && !newHeaders.has('Content-Type')) {
+      newHeaders.set('Content-Type', 'application/json');
+    }
+
+    response = await fetch(normalizedUrl, {
+      ...options,
+      headers: newHeaders,
+    });
+
+    // Step 3: Return response with status (caller checks .ok)
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${response.statusText}`,
+        status: response.status,
+      };
+    }
+
+    return { success: true, response, status: response.status };
   } catch (error) {
-    console.error('Error fetching dot phrases:', error);
-    throw error;
+    // Network error - no HTTP status available
+    return {
+      success: false,
+      error: error.message || 'Unknown error occurred',
+      // status is undefined for network errors
+    };
   }
+};
+
+// Fetch all dot phrases from backend
+// Returns: { success: true, data: object } or { success: false, error: string, status?: number }
+export const getAllDotPhrases = async () => {
+  const result = await fetchWithRefreshRetry('/api/dot-phrases', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+  if (!result.success) {
+    return result;
+  }
+
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Save transcript to backend
+// Returns: { success: true, data: object, status?: number } or { success: false, error: string, status?: number }
 export const saveTranscript = async (transcriptObj) => {
-  const jwt = getJWT();
-  try {
-    const res = await fetch(`${API_BASE}/api/transcripts`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwt}`
-      },
-      body: JSON.stringify(transcriptObj)
-    });
+  const result = await fetchWithRefreshRetry('/api/transcripts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(transcriptObj)
+  });
 
-    return await res.json();
-  } catch (error) {
-    console.error('Error saving transcript:', error);
-    return { success: false, error: error.message };
+  if (!result.success) {
+    return result;
   }
+
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Save SOAP note to backend
+// Returns: { success: true, data: object, status?: number } or { success: false, error: string, status?: number }
 export const saveSoapNote = async (soapNoteObj) => {
-  const jwt = getJWT();
-  try {
-    const res = await fetch(`${API_BASE}/api/soap-notes`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwt}`
-      },
-      body: JSON.stringify(soapNoteObj)
-    });
+  const result = await fetchWithRefreshRetry('/api/soap-notes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(soapNoteObj)
+  });
 
-    return await res.json();
-  } catch (error) {
-    console.error('Error saving SOAP note:', error);
-    return { success: false, error: error.message };
+  if (!result.success) {
+    return result;
   }
+
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Update SOAP note (including billing suggestion)
+// Update SOAP note (including billing suggestion)
+// Returns: { success: true, data: object, status?: number } or { success: false, error: string, status?: number }
 export const patchSoapNote = async (id, { soapNote_text }) => {
-  const jwt = getJWT();
-  if (!jwt) {
-    throw new Error('User not logged in');
+  const result = await fetchWithRefreshRetry(`/api/soap-notes/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ soapNote_text }),
+    cache: 'no-store',
+  });
+
+  if (!result.success) {
+    return result;
   }
 
-  try {
-    const response = await fetch(`${API_BASE}/api/soap-notes/${id}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        soapNote_text,
-      }),
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Failed to save SOAP note: ${response.status} ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error updating SOAP note:', error);
-    throw error;
-  }
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Create new dot phrase
+// Returns: { success: true, data: object, status?: number } or { success: false, error: string, status?: number }
 export const createDotPhrase = async (dotPhraseObj) => {
-  const jwt = getJWT();
-  if (!jwt) {
-    throw new Error('User not logged in');
+  const result = await fetchWithRefreshRetry('/api/dot-phrases', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dotPhraseObj),
+  });
+
+  if (!result.success) {
+    return result;
   }
 
-  try {
-    const response = await fetch(`${API_BASE}/api/dot-phrases`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwt}`,
-      },
-      body: JSON.stringify(dotPhraseObj),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const error = new Error(errorData.message || `HTTP ${response.status}`);
-      error.status = response.status;
-      throw error;
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error creating dot phrase:', error);
-    throw error;
-  }
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Update existing dot phrase (ID in URL path)
+// Returns: { success: true, data: object } or { success: false, error: string, status?: number }
 export const updateDotPhrase = async (id, dotPhraseObj) => {
-  const jwt = getJWT();
-  if (!jwt) {
-    throw new Error('User not logged in');
+  const result = await fetchWithRefreshRetry(`/api/dot-phrases/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(dotPhraseObj),
+  });
+  if (!result.success) {
+    return result;
   }
 
-  try {
-    const response = await fetch(`${API_BASE}/api/dot-phrases/${id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwt}`,
-      },
-      body: JSON.stringify(dotPhraseObj),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const error = new Error(errorData.message || `HTTP ${response.status}`);
-      error.status = response.status;
-      throw error;
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error updating dot phrase:', error);
-    throw error;
-  }
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Delete transcript by ID
+// Returns: { success: true, data: object, status?: number } or { success: false, error: string, status?: number }
 export const deleteTranscript = async (id) => {
-  const jwt = getJWT();
-  try {
-    const res = await fetch(`${API_BASE}/api/transcripts/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${jwt}` }
-    });
+  const result = await fetchWithRefreshRetry(`/api/transcripts/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  });
 
-    return await res.json();
-  } catch (error) {
-    console.error('Error deleting transcript:', error);
-    return { success: false, error: error.message };
+  if (!result.success) {
+    return result;
   }
+
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Delete SOAP note by ID
+// Returns: { success: true, data: object, status?: number } or { success: false, error: string, status?: number }
 export const deleteSoapNote = async (id) => {
-  const jwt = getJWT();
-  try {
-    const res = await fetch(`${API_BASE}/api/soap-notes/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${jwt}` }
-    });
+  const result = await fetchWithRefreshRetry(`/api/soap-notes/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  });
 
-    return await res.json();
-  } catch (error) {
-    console.error('Error deleting SOAP note:', error);
-    return { success: false, error: error.message };
+  if (!result.success) {
+    return result;
   }
+
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Delete dot phrase by ID
+// Returns: { success: true, data: object, status?: number } or { success: false, error: string, status?: number }
 export const deleteDotPhrase = async (id) => {
-  const jwt = getJWT();
-  if (!jwt) {
-    throw new Error('User not logged in');
+  const result = await fetchWithRefreshRetry(`/api/dot-phrases/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!result.success) {
+    return result;
   }
 
-  try {
-    const response = await fetch(`${API_BASE}/api/dot-phrases/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const error = new Error(errorData.message || `HTTP ${response.status}`);
-      error.status = response.status;
-      throw error;
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error deleting dot phrase:', error);
-    throw error;
-  }
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Fetch recordings with attachment status filter
-export const getRecordings = async ({ attached, limit = 100, offset = 0, sortBy = 'name', order = 'asc' }) => {
-  const jwt = getJWT();
-  if (!jwt) {
-    throw new Error('User not logged in');
+export const getRecordingsByAttached = async ({ attached, limit = 100, offset = 0, sortBy = 'name', order = 'asc' }) => {
+  const queryParams = new URLSearchParams({
+    attached: attached.toString(),
+    limit: limit.toString(),
+    offset: offset.toString(),
+    sortBy,
+    order
+  });
+
+  const result = await fetchWithRefreshRetry(`/api/recordings/attachments?${queryParams}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  if (!result.success) {
+    return result;
   }
 
-  try {
-    const queryParams = new URLSearchParams({
-      attached: attached.toString(),
-      limit: limit.toString(),
-      offset: offset.toString(),
-      sortBy,
-      order
-    });
-
-    const response = await fetch(`${API_BASE}/api/recordings/attachments?${queryParams}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching recordings:', error);
-    throw error;
-  }
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Fetch single recording by ID
+// Fetch single recording by ID
+// Returns: { success: true, data: object, status?: number } or { success: false, error: string, status?: number }
 export const getRecordingById = async (id) => {
-  const jwt = getJWT();
-  if (!jwt) {
-    throw new Error('User not logged in');
+  const result = await fetchWithRefreshRetry(`/api/recordings/${id}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+  });
+
+  if (!result.success) {
+    return result;
   }
 
-  try {
-    const response = await fetch(`${API_BASE}/api/recordings/${id}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching recording:', error);
-    throw error;
-  }
+  const data = await result.response.json();
+  return { success: true, data, status: result.status };
 };
 
 // Search transcripts by text (client-side after fetching all)
 export const searchTranscripts = async (query) => {
-  const transcripts = await getAllTranscripts();
+  const result = await getAllTranscripts();
+  if (!result.success) {
+    console.error('Failed to search transcripts:', result.error);
+    return [];
+  }
+  const transcripts = result.data;
   const results = [];
 
   for (const [id, transcript] of Object.entries(transcripts)) {
@@ -890,3 +841,68 @@ export const searchTranscripts = async (query) => {
 
   return results.sort((a, b) => b.timestamp - a.timestamp);
 };
+
+/**
+ * Step 2: Upload file to signed URL using XHR with progress tracking
+ * 
+ * Use case: After obtaining a signed URL from backend, upload file directly to it
+ * 
+ * Why XHR:
+ * - Native progress events for real-time tracking
+ * - Simpler error handling than fetch streams
+ * - Works with all browsers
+ * 
+ * Note: Signed URL is self-authenticating (no JWT needed for this operation)
+ */
+export const xhrUploadToSignedUrl = async (signedUrl, file, onProgress) => {
+  console.log('[xhrUploadToSignedUrl] Starting XHR upload to signed URL:', {
+    fileName: file.name,
+    fileSize: file.size
+  });
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    // Track upload progress
+    if (onProgress) {
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const progress = {
+            loaded: event.loaded,
+            total: event.total,
+            percent: Math.round((event.loaded / event.total) * 100),
+          };
+          console.log('[xhrUploadToSignedUrl] Progress:', progress);
+          onProgress(progress);
+        }
+      });
+    }
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        console.log('[xhrUploadToSignedUrl] Upload successful:', {
+          status: xhr.status,
+        });
+        resolve({ status: xhr.status });
+      } else {
+        console.error('[xhrUploadToSignedUrl] Upload returned non-2xx status:', xhr.status);
+        reject(new Error(`Upload failed: HTTP ${xhr.status}`));
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      console.error('[xhrUploadToSignedUrl] XHR network error');
+      reject(new Error('Upload failed: network error'));
+    });
+
+    xhr.addEventListener('abort', () => {
+      console.warn('[xhrUploadToSignedUrl] Upload aborted by user');
+      reject(new Error('Upload aborted'));
+    });
+
+    xhr.open('PUT', signedUrl);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    xhr.send(file);
+  });
+};
+
