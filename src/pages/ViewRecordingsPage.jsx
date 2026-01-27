@@ -26,6 +26,7 @@ export default function ViewRecordingsPage() {
   );
   const [hoveredRecordingId, setHoveredRecordingId] = useState(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [hasLoadedUnattached, setHasLoadedUnattached] = useState(false);
 
   const fetchRecordings = useCallback(
     async (attached, sortBy = "name", order = "asc") => {
@@ -53,74 +54,65 @@ export default function ViewRecordingsPage() {
     [navigate],
   );
 
-  const loadAllRecordings = useCallback(
+  const loadAttachedRecordings = useCallback(
     async (
       attachedSort = attachedSortBy,
-      unattachedSort = unattachedSortBy,
       attachedOrd = attachedOrder,
+    ) => {
+      setLoading(true);
+      const attached = await fetchRecordings(true, attachedSort, attachedOrd);
+      setAttachedRecordings(attached);
+      setLoading(false);
+    },
+    [attachedSortBy, attachedOrder, fetchRecordings],
+  );
+
+  const loadUnattachedRecordings = useCallback(
+    async (
+      unattachedSort = unattachedSortBy,
       unattachedOrd = unattachedOrder,
     ) => {
       setLoading(true);
-      const [attached, unattached] = await Promise.all([
-        fetchRecordings(true, attachedSort, attachedOrd),
-        fetchRecordings(false, unattachedSort, unattachedOrd),
-      ]);
-
-      setAttachedRecordings(attached);
+      const unattached = await fetchRecordings(false, unattachedSort, unattachedOrd);
       setUnattachedRecordings(unattached);
+      setHasLoadedUnattached(true);
       setLoading(false);
     },
-    [
-      attachedSortBy,
-      unattachedSortBy,
-      attachedOrder,
-      unattachedOrder,
-      fetchRecordings,
-      setLoading,
-      setAttachedRecordings,
-      setUnattachedRecordings,
-    ],
+    [unattachedSortBy, unattachedOrder, fetchRecordings],
   );
 
+  // Load attached recordings on mount
   useEffect(() => {
-    loadAllRecordings();
-  }, [loadAllRecordings]);
+    loadAttachedRecordings();
+  }, [loadAttachedRecordings]);
+
+  // Load unattached recordings when user switches to unattached tab
+  useEffect(() => {
+    if (activeTab === "unattached" && !hasLoadedUnattached) {
+      loadUnattachedRecordings();
+    }
+  }, [activeTab, hasLoadedUnattached, loadUnattachedRecordings]);
 
   const handleAttachedSortChange = (newSort) => {
     setAttachedSortBy(newSort);
-    loadAllRecordings(
-      newSort,
-      unattachedSortBy,
-      attachedOrder,
-      unattachedOrder,
-    );
+    loadAttachedRecordings(newSort, attachedOrder);
   };
 
   const handleAttachedOrderToggle = () => {
     const newOrder = attachedOrder === "asc" ? "desc" : "asc";
     setAttachedOrder(newOrder);
-    loadAllRecordings(
-      attachedSortBy,
-      unattachedSortBy,
-      newOrder,
-      unattachedOrder,
-    );
+    loadAttachedRecordings(attachedSortBy, newOrder);
   };
 
   const handleUnattachedSortChange = (newSort) => {
     setUnattachedSortBy(newSort);
-    loadAllRecordings(attachedSortBy, newSort, attachedOrder, unattachedOrder);
+    loadUnattachedRecordings(newSort, unattachedOrder);
   };
 
   const handleUnattachedOrderToggle = () => {
     const newOrder = unattachedOrder === "asc" ? "desc" : "asc";
     setUnattachedOrder(newOrder);
-    loadAllRecordings(
-      attachedSortBy,
-      unattachedSortBy,
-      attachedOrder,
-      newOrder,
-    );
+    loadUnattachedRecordings(unattachedSortBy, newOrder);
   };
 
   const getRecordingName = (path) => {
