@@ -120,6 +120,12 @@ function EditPatientEncounterPage() {
     };
     fetchData();
   }, [id]);
+
+  // Sync preview name with loaded name
+  useEffect(() => {
+    setPreviewPatientEncounterName(patientEncounterName);
+  }, [patientEncounterName]);
+
   // Audio event handlers
   const handleAudioLoadedMetadata = () => {
     if (audioPlayerRef.current) {
@@ -318,7 +324,6 @@ function EditPatientEncounterPage() {
             patientEncounterData={{ name: patientEncounterName }}
             transcriptData={{ transcript_text: transcript }}
             soapNotesData={associatedSoapNotes}
-            billingSuggestionData={billingSuggestion}
           />
         </div>
 
@@ -431,7 +436,7 @@ function EditPatientEncounterPage() {
             disabled={false}
           >
             <span className="text-lg font-semibold">
-              2. Edit Transcript and SOAP Note
+              2. Edit Name and Transcript
             </span>
             <span className="text-xl">
               {openSections.transcript ? "−" : "+"}
@@ -445,6 +450,19 @@ function EditPatientEncounterPage() {
                   <div className="text-sm">{errorMessage}</div>
                 </div>
               )}
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-xl text-gray-700 mb-2">
+                  Patient Encounter Name
+                </label>
+                <input
+                  type="text"
+                  value={previewPatientEncounterName}
+                  onChange={(e) => setPreviewPatientEncounterName(e.target.value)}
+                  disabled={isSaving}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-gray-300 bg-white"
+                  placeholder="Enter patient encounter name..."
+                />
+              </div>
               <div className="mb-6">
                 <label className="block text-sm font-bold text-xl text-gray-700 mb-2">
                   Transcript
@@ -474,13 +492,13 @@ function EditPatientEncounterPage() {
                   /> */}
 
                   <button
-                    onClick={() => setShowPreview({ type: "transcript" })}
+                    onClick={() => savePatientEncounterAndTranscript(patientEncounterId)}
                     disabled={isSaving}
                     className={`bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-medium ${
                       isSaving ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
-                    Preview & Save Transcript
+                    Save Name and Transcript
                   </button>
                   {errorMessage && (
                     <div className="mt-3 text-red-600 text-sm text-right w-full">
@@ -746,14 +764,14 @@ function EditPatientEncounterPage() {
                 <div className="flex flex-col items-end">
                   <button
                     onClick={() =>
-                      setShowPreview({ type: "soapNoteBillingSuggestion" })
+                      saveSoapNote_BillingSuggestion(selectedSoapNoteId)
                     }
                     disabled={isSaving}
                     className={`bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-medium ${
                       isSaving ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
-                    Preview & Save SOAP Note and Billing Suggestion
+                    Save SOAP Note and Billing Suggestion
                   </button>
                 </div>
               </div>
@@ -761,43 +779,7 @@ function EditPatientEncounterPage() {
           )}
         </div>
       </div>
-      {showPreview && showPreview.type === "transcript" && (
-        <PatientEncounterPreviewOverlay
-          isOpen={true}
-          onClose={() => setShowPreview(false)}
-          transcript={transcript}
-          setTranscript={setTranscript}
-          patientEncounterName={previewPatientEncounterName}
-          setPatientEncounterName={setPreviewPatientEncounterName}
-          onSave={() => savePatientEncounterAndTranscript(patientEncounterId)}
-          isSaving={isSaving}
-          errorMessage={errorMessage}
-          sections={["transcript"]}
-        />
-      )}
-      {showPreview && showPreview.type === "soapNoteBillingSuggestion" && (
-        <PatientEncounterPreviewOverlay
-          isOpen={true}
-          onClose={() => setShowPreview(false)}
-          soapSubjective={soapSubjective}
-          setSoapSubjective={setSoapSubjective}
-          soapObjective={soapObjective}
-          setSoapObjective={setSoapObjective}
-          soapAssessment={soapAssessment}
-          setSoapAssessment={setSoapAssessment}
-          soapPlan={soapPlan}
-          setSoapPlan={setSoapPlan}
-          billingSuggestion={billingSuggestion}
-          setBillingSuggestion={setBillingSuggestion}
-          patientEncounterName={previewPatientEncounterName}
-          setPatientEncounterName={setPreviewPatientEncounterName}
-          onSave={() => saveSoapNote_BillingSuggestion(selectedSoapNoteId)}
-          isSaving={isSaving}
-          errorMessage={errorMessage}
-          sections={["soapNote", "billingSuggestion"]}
-          isPatientEncounterNameEditable={false}
-        />
-      )}
+
     </>
   );
 }

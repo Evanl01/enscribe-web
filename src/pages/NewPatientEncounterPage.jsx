@@ -2367,10 +2367,10 @@ export default function NewPatientEncounterPage() {
                             assessment: soapAssessment,
                             plan: soapPlan,
                           },
+                          billingSuggestion,
                         },
                       },
                     ]}
-                    billingSuggestionData={billingSuggestion}
                   />
                   <button
                     onClick={() => setShowPreview(true)}
