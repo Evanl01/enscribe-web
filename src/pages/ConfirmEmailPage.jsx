@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as api from "@/lib/api";
+import { STORAGE_KEYS } from "@/utils/storageConfig.js";
 
 export default function ConfirmEmailPage() {
   // Initialize resendEmail with sessionStorage value
@@ -22,8 +23,7 @@ export default function ConfirmEmailPage() {
   const [cooldownSeconds, setCooldownSeconds] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
-        const STORAGE_KEY = 'resend_confirmation_cooldown_ts';
-        const ts = Number(localStorage.getItem(STORAGE_KEY) || 0);
+        const ts = Number(localStorage.getItem(STORAGE_KEYS.confirmEmail.resendConfirmationCooldownTs) || 0);
         if (!ts) return 0;
         const rem = Math.ceil((ts - Date.now()) / 1000);
         return rem > 0 ? rem : 0;
@@ -52,11 +52,10 @@ export default function ConfirmEmailPage() {
   };
 
   const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
-  const STORAGE_KEY = 'resend_confirmation_cooldown_ts';
 
   const getRemainingSeconds = () => {
     try {
-      const ts = Number(localStorage.getItem(STORAGE_KEY) || 0);
+      const ts = Number(localStorage.getItem(STORAGE_KEYS.confirmEmail.resendConfirmationCooldownTs) || 0);
       if (!ts) return 0;
       const rem = Math.ceil((ts - Date.now()) / 1000);
       return rem > 0 ? rem : 0;
@@ -80,7 +79,7 @@ export default function ConfirmEmailPage() {
 
     // sync across tabs
     const onStorage = (e) => {
-      if (e.key === STORAGE_KEY) {
+      if (e.key === STORAGE_KEYS.confirmEmail.resendConfirmationCooldownTs) {
         setCooldownSeconds(getRemainingSeconds());
       }
     };
@@ -115,7 +114,7 @@ export default function ConfirmEmailPage() {
       // start cooldown and persist timestamp so reloads/tabs respect it
       try {
         const ts = Date.now() + COOLDOWN_MS;
-        localStorage.setItem(STORAGE_KEY, String(ts));
+        localStorage.setItem(STORAGE_KEYS.confirmEmail.resendConfirmationCooldownTs, String(ts));
         setCooldownSeconds(Math.ceil(COOLDOWN_MS / 1000));
         // start a short interval to update countdown immediately
         const interval = setInterval(() => {

@@ -2,6 +2,7 @@ import React, { useEffect, useCallback, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import * as api from '@/lib/api'
 import * as format from '@/utils/format.js'
+import { STORAGE_KEYS } from '@/utils/storageConfig.js'
 import parseSoapNotes from '@/utils/parseSoapNotes'
 import Auth from '@/components/Auth.jsx'
 
@@ -16,7 +17,7 @@ const DashboardPage = () => {
   const [recentPatientEncounters, setRecentPatientEncounters] = useState([])
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('dashboardActiveTab') || 'encounters'
+      return localStorage.getItem(STORAGE_KEYS.ui.dashboardActiveTab) || 'encounters'
     }
     return 'encounters'
   })
@@ -97,7 +98,7 @@ const DashboardPage = () => {
   const switchTab = (tabName) => {
     setActiveTab(tabName)
     if (typeof window !== 'undefined') {
-      localStorage.setItem('dashboardActiveTab', tabName)
+      localStorage.setItem(STORAGE_KEYS.ui.dashboardActiveTab, tabName)
     }
   }
 

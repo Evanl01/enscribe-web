@@ -6,6 +6,7 @@ import * as ui from "@/utils/ui.js";
 import * as format from "@/utils/format.js";
 import * as validation from "@/utils/validation.js";
 import * as background from "@/utils/background.js";
+import { STORAGE_KEYS, parseStorageValue } from "@/utils/storageConfig.js";
 import PatientEncounterPreviewOverlay from "@/components/PatientEncounterPreviewOverlay";
 import { record, set } from "zod";
 import ExportDataAsFileMenu from "@/components/ExportDataAsFileMenu.jsx";
@@ -58,23 +59,15 @@ export default function NewPatientEncounterPage() {
     billingSuggestion: false,
   });
 
+  // Flag to prevent auto-save useEffects from running before initial restoration
+  const [restorationComplete, setRestorationComplete] = useState(false);
+
   // For rich text editing
   const handleEditableChange = (setter) => (e) => {
     setter(e.target.innerHTML);
   };
 
-  // LocalStorage keys
-  const LS_KEYS = {
-    patientEncounterName: "enscribe_patientEncounterName",
-    transcript: "enscribe_transcript",
-    soapSubjective: "enscribe_soapSubjective",
-    soapObjective: "enscribe_soapObjective",
-    soapAssessment: "enscribe_soapAssessment",
-    soapPlan: "enscribe_soapPlan",
-    billingSuggestion: "enscribe_billingSuggestion",
-    recordingFileMetadata: "enscribe_recordingFileMetadata", // <-- renamed from audioFileMetadata
-    recordingFile: "enscribe_recordingFile", // (optional, if you use this elsewhere)
-  };
+  // LocalStorage keys now use centralized config from storageConfig.js
     // Load recording file from localStorage on page mount only
   useEffect(() => {
     // Only load from localStorage if there's no URL recording being processed
@@ -85,13 +78,46 @@ export default function NewPatientEncounterPage() {
 
   // Restore from localStorage on mount and enable Section 2 if any field exists
   useEffect(() => {
-    const name = localStorage.getItem(LS_KEYS.patientEncounterName) || "";
-    const transcript = localStorage.getItem(LS_KEYS.transcript) || "";
-    const subjective = localStorage.getItem(LS_KEYS.soapSubjective) || "";
-    const objective = localStorage.getItem(LS_KEYS.soapObjective) || "";
-    const assessment = localStorage.getItem(LS_KEYS.soapAssessment) || "";
-    const plan = localStorage.getItem(LS_KEYS.soapPlan) || "";
-    const billing = localStorage.getItem(LS_KEYS.billingSuggestion) || "";
+    console.log('[NewPatientEncounterPage] Restoring form data from localStorage...');
+    
+    const name = parseStorageValue(STORAGE_KEYS.newPatientEncounter.patientEncounterName);
+    const transcript = parseStorageValue(STORAGE_KEYS.newPatientEncounter.transcript);
+    const subjective = parseStorageValue(STORAGE_KEYS.newPatientEncounter.soapSubjective);
+    const objective = parseStorageValue(STORAGE_KEYS.newPatientEncounter.soapObjective);
+    const assessment = parseStorageValue(STORAGE_KEYS.newPatientEncounter.soapAssessment);
+    const plan = parseStorageValue(STORAGE_KEYS.newPatientEncounter.soapPlan);
+    const billing = parseStorageValue(STORAGE_KEYS.newPatientEncounter.billingSuggestion);
+    
+    console.log('[NewPatientEncounterPage] Raw localStorage values:', {
+      patientEncounterName: name ? `"${name.substring(0, 50)}..."` : 'empty',
+      transcript: transcript ? `"${transcript.substring(0, 50)}..."` : 'empty',
+      soapSubjective: subjective ? `"${subjective.substring(0, 50)}..."` : 'empty',
+      soapObjective: objective ? `"${objective.substring(0, 50)}..."` : 'empty',
+      soapAssessment: assessment ? `"${assessment.substring(0, 50)}..."` : 'empty',
+      soapPlan: plan ? `"${plan.substring(0, 50)}..."` : 'empty',
+      billingSuggestion: billing ? `"${billing.substring(0, 50)}..."` : 'empty',
+    });
+    
+    console.log('[NewPatientEncounterPage] Restored fields (has content):', {
+      patientEncounterName: name.length > 0,
+      transcript: transcript.length > 0,
+      soapSubjective: subjective.length > 0,
+      soapObjective: objective.length > 0,
+      soapAssessment: assessment.length > 0,
+      soapPlan: plan.length > 0,
+      billingSuggestion: billing.length > 0,
+    });
+    
+    console.log('[NewPatientEncounterPage] About to set state with parsed values:', {
+      name: name.substring(0, 50),
+      transcript: transcript.substring(0, 50),
+      subjective: subjective.substring(0, 50),
+      objective: objective.substring(0, 50),
+      assessment: assessment.substring(0, 50),
+      plan: plan.substring(0, 50),
+      billing: billing.substring(0, 50),
+    });
+    
     setPatientEncounterName(name);
     setTranscript(transcript);
     setSoapSubjective(subjective);
@@ -99,18 +125,29 @@ export default function NewPatientEncounterPage() {
     setSoapAssessment(assessment);
     setSoapPlan(plan);
     setBillingSuggestion(billing);
+    
+    console.log('[NewPatientEncounterPage] State setters called');
+    
     // If any field has data, enable section 2
-    if (
+    const hasData = 
       name.trim() ||
       transcript.trim() ||
       subjective.trim() ||
       objective.trim() ||
       assessment.trim() ||
       plan.trim() ||
-      billing.trim()
-    ) {
+      billing.trim();
+    
+    if (hasData) {
+      console.log('[NewPatientEncounterPage] Found restored data, expanding Section 2');
       setSoapNoteRequested(true);
+    } else {
+      console.log('[NewPatientEncounterPage] No saved form data found in localStorage');
     }
+
+    // Mark restoration as complete - NOW auto-save useEffects can run
+    setRestorationComplete(true);
+    console.log('[NewPatientEncounterPage] Restoration complete, auto-save effects enabled');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle URL recording parameter
@@ -167,7 +204,7 @@ export default function NewPatientEncounterPage() {
 
         // Store in localStorage like the upload flow does
         localStorage.setItem(
-          LS_KEYS.recordingFileMetadata,
+          STORAGE_KEYS.newPatientEncounter.recordingFileMetadata,
           JSON.stringify(metadata)
         );
 
@@ -196,30 +233,38 @@ export default function NewPatientEncounterPage() {
     };
 
     loadRecordingFromUrl();
-  }, [urlRecordingPath, LS_KEYS.recordingFileMetadata]); // Remove supabase from dependency array since it's stable
+  }, [urlRecordingPath, STORAGE_KEYS.newPatientEncounter.recordingFileMetadata]); // Remove supabase from dependency array since it's stable
 
-  // Save to localStorage on change
+  // Save to localStorage on change (with JSON stringify for proper serialization)
+  // Only run AFTER restoration is complete to avoid overwriting with empty initial state
   useEffect(() => {
-    localStorage.setItem(LS_KEYS.patientEncounterName, patientEncounterName);
-  }, [patientEncounterName, LS_KEYS.patientEncounterName]);
+    if (!restorationComplete) return;
+    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.patientEncounterName, JSON.stringify(patientEncounterName));
+  }, [patientEncounterName, STORAGE_KEYS.newPatientEncounter.patientEncounterName, restorationComplete]);
   useEffect(() => {
-    localStorage.setItem(LS_KEYS.transcript, transcript);
-  }, [transcript, LS_KEYS.transcript]);
+    if (!restorationComplete) return;
+    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.transcript, JSON.stringify(transcript));
+  }, [transcript, STORAGE_KEYS.newPatientEncounter.transcript, restorationComplete]);
   useEffect(() => {
-    localStorage.setItem(LS_KEYS.soapSubjective, soapSubjective);
-  }, [soapSubjective, LS_KEYS.soapSubjective]);
+    if (!restorationComplete) return;
+    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.soapSubjective, JSON.stringify(soapSubjective));
+  }, [soapSubjective, STORAGE_KEYS.newPatientEncounter.soapSubjective, restorationComplete]);
   useEffect(() => {
-    localStorage.setItem(LS_KEYS.soapObjective, soapObjective);
-  }, [soapObjective, LS_KEYS.soapObjective]);
+    if (!restorationComplete) return;
+    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.soapObjective, JSON.stringify(soapObjective));
+  }, [soapObjective, STORAGE_KEYS.newPatientEncounter.soapObjective, restorationComplete]);
   useEffect(() => {
-    localStorage.setItem(LS_KEYS.soapAssessment, soapAssessment);
-  }, [soapAssessment, LS_KEYS.soapAssessment]);
+    if (!restorationComplete) return;
+    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.soapAssessment, JSON.stringify(soapAssessment));
+  }, [soapAssessment, STORAGE_KEYS.newPatientEncounter.soapAssessment, restorationComplete]);
   useEffect(() => {
-    localStorage.setItem(LS_KEYS.soapPlan, soapPlan);
-  }, [soapPlan, LS_KEYS.soapPlan]);
+    if (!restorationComplete) return;
+    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.soapPlan, JSON.stringify(soapPlan));
+  }, [soapPlan, STORAGE_KEYS.newPatientEncounter.soapPlan, restorationComplete]);
   useEffect(() => {
-    localStorage.setItem(LS_KEYS.billingSuggestion, billingSuggestion);
-  }, [billingSuggestion, LS_KEYS.billingSuggestion]);
+    if (!restorationComplete) return;
+    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.billingSuggestion, JSON.stringify(billingSuggestion));
+  }, [billingSuggestion, STORAGE_KEYS.newPatientEncounter.billingSuggestion, restorationComplete]);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingDurationRef = useRef(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -409,7 +454,7 @@ export default function NewPatientEncounterPage() {
   const [audioLoadingState, setAudioLoadingState] = useState("idle");
 
   const getLocalStorageRecordingFile = async () => {
-    const metadataStr = localStorage.getItem(LS_KEYS.recordingFileMetadata);
+    const metadataStr = localStorage.getItem(STORAGE_KEYS.newPatientEncounter.recordingFileMetadata);
     if (!metadataStr) return null;
 
     try {
@@ -1110,8 +1155,8 @@ export default function NewPatientEncounterPage() {
       }
 
       // Clear old recording file from localStorage and reset local variables
-      localStorage.removeItem(LS_KEYS.recordingFile);
-      localStorage.removeItem(LS_KEYS.recordingFileMetadata);
+      localStorage.removeItem(STORAGE_KEYS.newPatientEncounter.recordingFile);
+      localStorage.removeItem(STORAGE_KEYS.newPatientEncounter.recordingFileMetadata);
       setRecordingFile(null);
       setRecordingDuration(0);
       setRecordingFileMetadata(null);
@@ -1170,12 +1215,12 @@ export default function NewPatientEncounterPage() {
 
       // Store with new key name
       localStorage.setItem(
-        LS_KEYS.recordingFileMetadata,
+        STORAGE_KEYS.newPatientEncounter.recordingFileMetadata,
         JSON.stringify(metadata)
       );
       
       // Verify what was actually saved
-      const savedMetadata = JSON.parse(localStorage.getItem(LS_KEYS.recordingFileMetadata));
+      const savedMetadata = JSON.parse(localStorage.getItem(STORAGE_KEYS.newPatientEncounter.recordingFileMetadata));
       console.log("Metadata saved to localStorage - verification:", {
         savedPath: savedMetadata?.path,
         pathLength: savedMetadata?.path?.length,
@@ -1255,8 +1300,8 @@ export default function NewPatientEncounterPage() {
     }
 
     // Clear previous recording file and remove from localStorage
-    localStorage.removeItem(LS_KEYS.recordingFile);
-    localStorage.removeItem(LS_KEYS.recordingFileMetadata);
+    localStorage.removeItem(STORAGE_KEYS.newPatientEncounter.recordingFile);
+    localStorage.removeItem(STORAGE_KEYS.newPatientEncounter.recordingFileMetadata);
     setRecordingFile(null);
     setRecordingFileMetadata(null);
     // Reset recording duration to 0 when starting new recording
@@ -1424,7 +1469,7 @@ export default function NewPatientEncounterPage() {
   // Update the generateSoapNote function to handle recorded audio upload
   const generateSoapNote = async () => {
     // Clear localStorage and reset textareas
-    // Object.values(LS_KEYS).forEach((key) => localStorage.removeItem(key));
+    // Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
     setPatientEncounterName("");
     setTranscript("");
     setSoapSubjective("");
@@ -1456,7 +1501,7 @@ export default function NewPatientEncounterPage() {
         let recording_file_path = "";
 
         // Check if we have recording file metadata (works for both upload and URL flows)
-        const metadataStr = localStorage.getItem(LS_KEYS.recordingFileMetadata);
+        const metadataStr = localStorage.getItem(STORAGE_KEYS.newPatientEncounter.recordingFileMetadata);
         if (metadataStr) {
           // File was uploaded or loaded from URL - use existing metadata
           const metadata = JSON.parse(metadataStr);
@@ -1563,7 +1608,14 @@ export default function NewPatientEncounterPage() {
                     jsonData.status === "transcription complete" &&
                     jsonData.data?.transcript
                   ) {
+                    console.log('[generateSoapNote] Received transcript:', jsonData.data.transcript.substring(0, 100));
                     setTranscript(jsonData.data.transcript);
+                    // Store transcript immediately to localStorage
+                    localStorage.setItem(
+                      STORAGE_KEYS.newPatientEncounter.transcript,
+                      JSON.stringify(jsonData.data.transcript)
+                    );
+                    console.log('[generateSoapNote] Stored transcript to LS:', STORAGE_KEYS.newPatientEncounter.transcript.substring(0, 50));
                   }
                   if (
                     jsonData.status === "soap note complete" &&
@@ -1628,35 +1680,46 @@ export default function NewPatientEncounterPage() {
                       setBillingSuggestion(billingText.trim());
 
                       setIsProcessing(false);
-                      // Set localStorage with new keys
+                      // Set localStorage with new keys (with JSON stringify for proper serialization)
+                      // Note: transcript is already stored immediately when "transcription complete" arrives,
+                      // so we only store the SOAP-generated fields here
+                      console.log('[generateSoapNote] About to store to LS:', {
+                        soapSubjectiveText: soapSubjectiveText.substring(0, 50),
+                        soapObjectiveText: soapObjectiveText.substring(0, 50),
+                        soapAssessmentText: soapAssessmentText.substring(0, 50),
+                        soapPlanText: soapPlanText.substring(0, 50),
+                        billingText: billingText.trim().substring(0, 50),
+                        patientEncounterName,
+                      });
                       localStorage.setItem(
-                        LS_KEYS.patientEncounterName,
-                        patientEncounterName
+                        STORAGE_KEYS.newPatientEncounter.patientEncounterName,
+                        JSON.stringify(patientEncounterName)
                       );
-                      localStorage.setItem(LS_KEYS.transcript, jsonData.data.transcript);
                       localStorage.setItem(
-                        LS_KEYS.soapSubjective,
-                        soapSubjectiveText
+                        STORAGE_KEYS.newPatientEncounter.soapSubjective,
+                        JSON.stringify(soapSubjectiveText)
                       );
                       localStorage.setItem(
-                        LS_KEYS.soapObjective,
-                        soapObjectiveText
+                        STORAGE_KEYS.newPatientEncounter.soapObjective,
+                        JSON.stringify(soapObjectiveText)
                       );
                       localStorage.setItem(
-                        LS_KEYS.soapAssessment,
-                        soapAssessmentText
+                        STORAGE_KEYS.newPatientEncounter.soapAssessment,
+                        JSON.stringify(soapAssessmentText)
                       );
-                      localStorage.setItem(LS_KEYS.soapPlan, soapPlanText);
+                      localStorage.setItem(STORAGE_KEYS.newPatientEncounter.soapPlan, JSON.stringify(soapPlanText));
                       localStorage.setItem(
-                        LS_KEYS.billingSuggestion,
-                        billingText.trim()
+                        STORAGE_KEYS.newPatientEncounter.billingSuggestion,
+                        JSON.stringify(billingText.trim())
                       );
                     } catch (e) {
                       console.error(
-                        "Failed to parse SOAP note JSON:",
-                        e,
+                        "[generateSoapNote] CRITICAL: Failed to parse SOAP note JSON:",
+                        e.message,
+                        "Raw data:",
                         jsonData.data
                       );
+                      console.error("[generateSoapNote] Error stack:", e.stack);
                       setSoapSubjective("");
                       setSoapObjective("");
                       setSoapAssessment("");
@@ -1761,7 +1824,7 @@ export default function NewPatientEncounterPage() {
 
       // Get recording_file_path from localStorage metadata
       const recordingFileMetadata = localStorage.getItem(
-        LS_KEYS.recordingFileMetadata
+        STORAGE_KEYS.newPatientEncounter.recordingFileMetadata
       );
       let recording_file_path = "";
 
@@ -1825,7 +1888,7 @@ export default function NewPatientEncounterPage() {
         return;
       }
       // Clear localStorage for these fields after successful save
-      Object.values(LS_KEYS).forEach((key) => localStorage.removeItem(key));
+      Object.values(STORAGE_KEYS.newPatientEncounter).forEach(key => localStorage.removeItem(key));
       // Navigate back to dashboard
       setRecordingFile(null);
       setRecordingFileMetadata(null);

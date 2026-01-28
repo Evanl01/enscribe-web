@@ -1,5 +1,7 @@
 // lib/api.js - API-related functions
 
+import { STORAGE_KEYS } from '@/utils/storageConfig';
+
 export const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // Global mutex lock for preventing concurrent session refresh attempts
@@ -24,17 +26,17 @@ const acquireRefreshLock = async () => {
 // Helper to get JWT from localStorage (client-side only)
 export const getJWT = () => {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('jwt');
+  return localStorage.getItem(STORAGE_KEYS.auth.jwt);
 };
 
 // Set or clear JWT in localStorage (client-side only)
 export const setJWT = (token) => {
   if (typeof window === 'undefined') throw new Error('setJWT failed. Can only be called in the browser');
-  localStorage.setItem('jwt', token);
+  localStorage.setItem(STORAGE_KEYS.auth.jwt, token);
 };
 export const deleteJWT = () => {
   if (typeof window === 'undefined') throw new Error('deleteJWT failed. Can only be called in the browser');
-  localStorage.removeItem('jwt');
+  localStorage.removeItem(STORAGE_KEYS.auth.jwt);
 };
 
 // Sign-in helper: calls server to authenticate user and set session
@@ -66,7 +68,7 @@ export const signIn = async (email, password) => {
 
     // Store JWT and user email
     setJWT(jwt);
-    localStorage.setItem('userEmail', email);
+    localStorage.setItem(STORAGE_KEYS.auth.userEmail, email);
 
     // Post message for any listeners
     window.postMessage({ type: 'EMSCRIBE_LOGIN', jwt, userEmail: email }, '*');

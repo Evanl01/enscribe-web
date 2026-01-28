@@ -49,6 +49,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Local development notes
+FE_LOCAL_COMMIT_MESSAGE.txt
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

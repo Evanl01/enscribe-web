@@ -660,7 +660,7 @@ export default function ViewRecordingsPage() {
                   transition: "all 0.3s ease",
                 }}
               >
-                🎵 Unattached ({unattachedRecordings.length})
+                🎵 Unattached ({hasLoadedUnattached ? unattachedRecordings.length : "..."})
               </button>
             </div>
           </>
