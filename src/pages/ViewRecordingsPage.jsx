@@ -9,10 +9,10 @@ export default function ViewRecordingsPage() {
   const navigate = useNavigate();
   const [attachedRecordings, setAttachedRecordings] = useState([]);
   const [unattachedRecordings, setUnattachedRecordings] = useState([]);
-  const [attachedSortBy, setAttachedSortBy] = useState("name");
-  const [unattachedSortBy, setUnattachedSortBy] = useState("name");
-  const [attachedOrder, setAttachedOrder] = useState("asc");
-  const [unattachedOrder, setUnattachedOrder] = useState("asc");
+  const [attachedSortBy, setAttachedSortBy] = useState("date_created");
+  const [unattachedSortBy, setUnattachedSortBy] = useState("date_created");
+  const [attachedOrder, setAttachedOrder] = useState("desc");
+  const [unattachedOrder, setUnattachedOrder] = useState("desc");
   // Active tab: 'attached' or 'unattached'
   const [activeTab, setActiveTab] = useState("attached");
   const [loading, setLoading] = useState(true);

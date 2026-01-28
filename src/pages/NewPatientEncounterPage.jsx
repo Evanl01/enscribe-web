@@ -220,7 +220,7 @@ export default function NewPatientEncounterPage() {
         console.log('Loaded recording from URL and saved to localStorage:', {
           path: urlRecordingPath,
           fileName,
-          signedUrl: data.signedUrl,
+          signedUrl: signedUrlData.signedUrl,
           metadata
         });
         
