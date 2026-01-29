@@ -4,6 +4,7 @@ import * as api from "@/lib/api";
 import * as ui from "@/utils/ui.js";
 import * as format from "@/utils/format.js";
 import PatientEncounterPreviewOverlay from "@/components/PatientEncounterPreviewOverlay";
+import AudioPlayer from "@/components/AudioPlayer.jsx";
 import ExportDataAsFileMenu from "@/components/ExportDataAsFileMenu.jsx";
 import Auth from "@/components/Auth.jsx";
 import CopyToClipboard from '@/components/CopyToClipboard.jsx';
@@ -27,12 +28,6 @@ function EditPatientEncounterPage() {
   const [recordingFileName, setRecordingFileName] = useState("");
   const [recordingFileSize, setRecordingFileSize] = useState(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [audioLoaded, setAudioLoaded] = useState(false);
-  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
-  const [audioLoadingState, setAudioLoadingState] = useState("idle");
-  const [audioPlaying, setAudioPlaying] = useState(false);
-  const audioPlayerRef = useRef(null);
   const [selectedSoapNoteId, setSelectedSoapNoteId] = useState(null);
   const [sortBy, setSortBy] = useState("created_at");
   const [previewPatientEncounterName, setPreviewPatientEncounterName] =
@@ -94,11 +89,11 @@ function EditPatientEncounterPage() {
         setPatientEncounterName(data.patientEncounter.name || "");
         setTranscript(data.transcript.transcript_text || "");
         setRecordingFileUrl(data.recording.recording_file_signed_url || "");
-        // setRecordingFileName(
-        //   patientEncounterData.recording.recording_file_name || "audio"
-        // );
-        // setRecordingFileSize(patientEncounterData.recording.recording_file_size || 0);
-        // setRecordingDuration(patientEncounterData.recording.recording_duration || 0);
+        setRecordingFileName(
+          format.extractRecordingFilenameFromPath(data.recording.recording_file_path) || "recording.webm"
+        );
+        setRecordingFileSize(data.recording.recording_file_size || 0);
+        setRecordingDuration(data.recording.recording_duration || 0);
 
         // Parse soapNote_text if present
         if (data.soapNotes) {
@@ -109,13 +104,9 @@ function EditPatientEncounterPage() {
         console.error("Error fetching patient encounter data:", error);
         setErrorMessage(`Failed to load patient encounter: ${error.message}`);
         setRecordingFileUrl("");
-        // setRecordingFileName("");
-        // setRecordingFileSize(0);
-        // setRecordingDuration(0);
-        setAudioLoaded(false);
-        setAudioCurrentTime(0);
-        setAudioDuration(0);
-        setAudioLoadingState("error");
+        setRecordingFileName("");
+        setRecordingFileSize(0);
+        setRecordingDuration(0);
       }
     };
     fetchData();
@@ -126,66 +117,30 @@ function EditPatientEncounterPage() {
     setPreviewPatientEncounterName(patientEncounterName);
   }, [patientEncounterName]);
 
-  // Audio event handlers
-  const handleAudioLoadedMetadata = () => {
-    if (audioPlayerRef.current) {
-      const duration = audioPlayerRef.current.duration;
-      if (isFinite(duration) && duration > 0) {
-        setAudioDuration(duration);
-        setAudioLoaded(true);
-        setAudioLoadingState("loaded");
-      } else {
-        setAudioDuration(recordingDuration || 0);
-        setAudioLoaded(true);
-        setAudioLoadingState("loaded");
-      }
-    }
-  };
-
-  const handleAudioTimeUpdate = () => {
-    if (audioPlayerRef.current) {
-      setAudioCurrentTime(audioPlayerRef.current.currentTime);
-    }
-  };
-
-  const handleAudioEnded = () => {
-    setAudioCurrentTime(0);
-    setAudioPlaying(false);
-  };
-
+  // Audio error handler for AudioPlayer component
   const handleAudioError = (e) => {
-    setAudioLoadingState("error");
-    setAudioLoaded(false);
-    alert("Error loading audio file.");
-  };
-
-  // Audio control functions
-  const playAudio = async () => {
-    if (audioPlayerRef.current && audioLoaded) {
-      try {
-        await audioPlayerRef.current.play();
-        setAudioPlaying(true);
-      } catch (error) {
-        alert(`Error playing audio: ${error.message}`);
+    const error = e?.target?.error;
+    let errorMessage = "Unknown audio error";
+    if (error) {
+      switch (error.code) {
+        case 1:
+          errorMessage = "Audio loading was aborted";
+          break;
+        case 2:
+          errorMessage = "Network error occurred while loading audio";
+          break;
+        case 3:
+          errorMessage = "Audio decoding error - file may be corrupted";
+          break;
+        case 4:
+          errorMessage = "Audio format not supported by browser";
+          break;
+        default:
+          errorMessage = `Audio error (code: ${error.code})`;
       }
     }
-  };
-
-  const pauseAudio = () => {
-    if (audioPlayerRef.current) {
-      audioPlayerRef.current.pause();
-      setAudioPlaying(false);
-    }
-  };
-
-  const seekAudio = (time) => {
-    if (audioPlayerRef.current && audioLoaded) {
-      audioPlayerRef.current.currentTime = Math.min(
-        time,
-        audioDuration || recordingDuration || time
-      );
-      setAudioCurrentTime(audioPlayerRef.current.currentTime);
-    }
+    console.error(`Error loading audio: ${errorMessage}`, error);
+    alert(`Error loading audio: ${errorMessage}`);
   };
 
   // Format duration helper
@@ -350,71 +305,15 @@ function EditPatientEncounterPage() {
                       Recording Ready
                     </p>
                     <p className="text-sm text-green-600">
-                      {recordingFileName} (
-                      {(recordingFileSize / (1024 * 1024)).toFixed(1)}MB)
-                      {recordingDuration > 0 &&
-                        ` - ${formatDuration(recordingDuration)}`}
+                      {recordingFileName}
                     </p>
-                    <div className="mt-4 flex items-center gap-2 flex-wrap">
-                      <audio
-                        ref={audioPlayerRef}
+                    <div className="mt-4">
+                      <AudioPlayer
                         src={recordingFileUrl}
-                        onLoadedMetadata={handleAudioLoadedMetadata}
-                        onTimeUpdate={handleAudioTimeUpdate}
-                        onEnded={handleAudioEnded}
+                        filename={recordingFileName}
                         onError={handleAudioError}
-                        preload="metadata"
-                        style={{ display: "none" }}
+                        maxWidth="600px"
                       />
-                      <button
-                        type="button"
-                        onClick={playAudio}
-                        disabled={audioPlaying || audioLoadingState !== "loaded"}
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        ▶️ Play
-                      </button>
-                      <button
-                        type="button"
-                        onClick={pauseAudio}
-                        disabled={!audioPlaying}
-                        className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        ⏸️ Pause
-                      </button>
-                      <input
-                        type="range"
-                        min={0}
-                        max={
-                          isFinite(audioDuration) && audioDuration > 0
-                            ? audioDuration
-                            : recordingDuration || 100
-                        }
-                        step={0.1}
-                        value={audioCurrentTime}
-                        onChange={(e) => seekAudio(parseFloat(e.target.value))}
-                        className="w-32 md:w-48"
-                        disabled={audioLoaded === false}
-                      />
-                      <span className="text-xs text-gray-700 font-mono min-w-[80px] text-right">
-                        {formatDuration(audioCurrentTime)} /{" "}
-                        {formatDuration(
-                          isFinite(audioDuration)
-                            ? audioDuration
-                            : recordingDuration || 0
-                        )}
-                      </span>
-                      <span className="text-xs">
-                        {audioLoadingState === "loading" && (
-                          <span className="text-orange-600">🔄 Loading...</span>
-                        )}
-                        {audioLoadingState === "loaded" && (
-                          <span className="text-green-600">✅ Ready</span>
-                        )}
-                        {audioLoadingState === "error" && (
-                          <span className="text-red-600">❌ Error</span>
-                        )}
-                      </span>
                     </div>
                   </div>
                 </div>

@@ -24,12 +24,6 @@ export default function EditSoapNotePage() {
   const [soapPlan, setSoapPlan] = useState("");
   const [billingSuggestion, setBillingSuggestion] = useState("");
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [audioLoaded, setAudioLoaded] = useState(false);
-  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
-  const [audioLoadingState, setAudioLoadingState] = useState("idle");
-  const [audioPlaying, setAudioPlaying] = useState(false);
-  const audioPlayerRef = useRef(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -98,68 +92,6 @@ export default function EditSoapNotePage() {
     fetchData();
   }, [soapNoteId]);
 
-  // Audio event handlers
-  const handleAudioLoadedMetadata = () => {
-    if (audioPlayerRef.current) {
-      const duration = audioPlayerRef.current.duration;
-      if (isFinite(duration) && duration > 0) {
-        setAudioDuration(duration);
-        setAudioLoaded(true);
-        setAudioLoadingState("loaded");
-      } else {
-        setAudioDuration(recordingDuration || 0);
-        setAudioLoaded(true);
-        setAudioLoadingState("loaded");
-      }
-    }
-  };
-
-  const handleAudioTimeUpdate = () => {
-    if (audioPlayerRef.current) {
-      setAudioCurrentTime(audioPlayerRef.current.currentTime);
-    }
-  };
-
-  const handleAudioEnded = () => {
-    setAudioCurrentTime(0);
-    setAudioPlaying(false);
-  };
-
-  const handleAudioError = (e) => {
-    setAudioLoadingState("error");
-    setAudioLoaded(false);
-    alert("Error loading audio file.");
-  };
-
-  // Audio control functions
-  const playAudio = async () => {
-    if (audioPlayerRef.current && audioLoaded) {
-      try {
-        await audioPlayerRef.current.play();
-        setAudioPlaying(true);
-      } catch (error) {
-        alert(`Error playing audio: ${error.message}`);
-      }
-    }
-  };
-
-  const pauseAudio = () => {
-    if (audioPlayerRef.current) {
-      audioPlayerRef.current.pause();
-      setAudioPlaying(false);
-    }
-  };
-
-  const seekAudio = (time) => {
-    if (audioPlayerRef.current && audioLoaded) {
-      audioPlayerRef.current.currentTime = Math.min(
-        time,
-        audioDuration || recordingDuration || time
-      );
-      setAudioCurrentTime(audioPlayerRef.current.currentTime);
-    }
-  };
-
   // Save transcript and note
   const saveSoapNote = async () => {
     setIsSaving(true);
@@ -207,14 +139,6 @@ export default function EditSoapNotePage() {
       alert("Error saving data: " + error.message);
       setIsSaving(false);
     }
-  };
-
-  // Format duration helper
-  const formatDuration = (seconds) => {
-    if (!isFinite(seconds) || isNaN(seconds)) return "0:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   return (

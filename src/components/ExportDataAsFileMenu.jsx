@@ -25,10 +25,9 @@ export default function ExportDataAsFileMenu({
   return (
     <div
       className="relative inline-block"
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
     >
       <button
+        onClick={() => setShow(!show)}
         className="bg-[#DE7459] hover:bg-[#D1735E] text-white px-8 py-3 rounded-lg font-medium"
       >
         Export As...
@@ -36,6 +35,7 @@ export default function ExportDataAsFileMenu({
       {show && (
         <div className="absolute left-0 top-full w-full z-10 bg-white border border-gray-200 rounded-lg shadow-lg flex flex-col"
           style={{ marginTop: 0 }}
+          onClick={() => setShow(false)}
         >
           <button
             className="bg-white hover:bg-gray-100 text-black px-3 py-2 rounded-t w-full font-medium transition-all duration-150"

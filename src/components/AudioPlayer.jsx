@@ -1,0 +1,69 @@
+import React from "react";
+import { saveAs } from "file-saver";
+
+export default function AudioPlayer({ 
+  src, 
+  onError, 
+  filename = "recording.webm",
+  maxWidth = "100%"
+}) {
+  return (
+    <div style={{ 
+      padding: "4px", 
+      backgroundColor: "#f3f4f6", 
+      borderRadius: "12px",
+      maxWidth: maxWidth
+    }}>
+      <div style={{ display: "flex", gap: "0px", alignItems: "center" }}>
+        <audio 
+          controls 
+          controlsList="nodownload noplaybackrate"
+          style={{ flex: 1 }}
+          preload="metadata"
+          onError={onError}
+        >
+          <source src={src} type="audio/mpeg" />
+          Your browser does not support the audio element.
+        </audio>
+        
+        {/* Download Button with SVG */}
+        <button
+          onClick={async () => {
+            try {
+              const response = await fetch(src);
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              const blob = await response.blob();
+              saveAs(blob, filename);
+            } catch (error) {
+              console.error('Error downloading recording:', error);
+              alert('Failed to download recording. Please try again.');
+            }
+          }}
+          style={{
+            width: "40px",
+            height: "40px",
+            minWidth: "40px",
+            minHeight: "40px",
+            padding: "3px",
+            backgroundColor: "#f3f4f6",
+            border: "1px solid #d1d5db",
+            borderRadius: "50%",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "background-color 0.2s"
+          }}
+          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#e5e7eb")}
+          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+          title="Download recording"
+        >
+          <img src="/download-icon.svg" alt="Download" style={{ width: "18px", height: "18px" }} />
+        </button>
+
+        {/* Spacer for right padding */}
+        <div style={{ width: "10px" }} />
+      </div>
+    </div>
+  );
+}

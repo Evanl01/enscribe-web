@@ -115,9 +115,7 @@ export default function ViewRecordingsPage() {
     loadUnattachedRecordings(unattachedSortBy, newOrder);
   };
 
-  const getRecordingName = (path) => {
-    return path?.split("/").pop() || "unknown";
-  };
+
 
   const formatFileSize = (bytes) => {
     if (!bytes) return "Unknown size";
@@ -538,7 +536,7 @@ export default function ViewRecordingsPage() {
             wordBreak: "break-word",
           }}
         >
-          {getRecordingName(recording.path)}
+          {format.extractRecordingFilenameFromPath(recording.path)}
         </div>
         {isAttached && recording.patientEncounter && (
           <div

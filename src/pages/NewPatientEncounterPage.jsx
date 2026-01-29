@@ -8,6 +8,7 @@ import * as validation from "@/utils/validation.js";
 import * as background from "@/utils/background.js";
 import { STORAGE_KEYS, parseStorageValue } from "@/utils/storageConfig.js";
 import PatientEncounterPreviewOverlay from "@/components/PatientEncounterPreviewOverlay";
+import AudioPlayer from "@/components/AudioPlayer.jsx";
 import { record, set } from "zod";
 import ExportDataAsFileMenu from "@/components/ExportDataAsFileMenu.jsx";
 import Auth from "@/components/Auth.jsx";
@@ -191,7 +192,7 @@ export default function NewPatientEncounterPage() {
           return;
         }
         // Extract filename from path
-        const fileName = urlRecordingPath.split("/").pop() || "recording";
+        const fileName = format.extractRecordingFilenameFromPath(urlRecordingPath);
         
         // Create metadata object similar to upload flow
         const metadata = {
@@ -441,17 +442,8 @@ export default function NewPatientEncounterPage() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
-  const audioPlayerRef = useRef(null);
   const refreshIntervalRef = useRef(null);
   const fileInputRef = useRef(null);
-
-  // Audio playback state
-  const [audioPlaying, setAudioPlaying] = useState(false);
-  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
-  const [audioUrl, setAudioUrl] = useState(null);
-  const [audioLoaded, setAudioLoaded] = useState(false);
-  const [audioLoadingState, setAudioLoadingState] = useState("idle");
 
   const getLocalStorageRecordingFile = async () => {
     const metadataStr = localStorage.getItem(STORAGE_KEYS.newPatientEncounter.recordingFileMetadata);
@@ -575,107 +567,6 @@ export default function NewPatientEncounterPage() {
   //   saveAttempted,
   //   errorMessage,
   // ]);
-
-  // Update audioUrl when recordingFile changes
-  useEffect(() => {
-    if (recordingFile) {
-      const url = URL.createObjectURL(recordingFile);
-      setAudioUrl(url);
-      setAudioCurrentTime(0);
-      setAudioDuration(0);
-      setAudioLoaded(false);
-      setAudioLoadingState("loading");
-
-      return () => {
-        URL.revokeObjectURL(url);
-      };
-    } else {
-      setAudioUrl(null);
-      setAudioCurrentTime(0);
-      setAudioDuration(0);
-      setAudioLoaded(false);
-      setAudioLoadingState("idle");
-    }
-  }, [recordingFile]);
-
-  // Audio event handlers
-  const handleAudioLoadStart = () => {
-    setAudioLoadingState("loading");
-  };
-
-  const handleAudioLoadedMetadata = () => {
-    if (audioPlayerRef.current) {
-      const duration = audioPlayerRef.current.duration;
-
-      if (isFinite(duration) && duration > 0) {
-        setAudioDuration(duration);
-        setAudioLoaded(true);
-        setAudioLoadingState("loaded");
-      } else {
-        // For WebM files with invalid duration, use recorded duration as fallback
-        setAudioDuration(recordingDuration || 0);
-        setAudioLoaded(true);
-        setAudioLoadingState("loaded");
-      }
-    }
-  };
-
-  const handleAudioTimeUpdate = () => {
-    if (audioPlayerRef.current) {
-      const currentTime = audioPlayerRef.current.currentTime;
-      setAudioCurrentTime(currentTime);
-
-      // For WebM files with invalid duration, update duration based on playback
-      if (!isFinite(audioDuration) || audioDuration === 0) {
-        const realDuration = audioPlayerRef.current.duration;
-        if (isFinite(realDuration) && realDuration > 0) {
-          setAudioDuration(realDuration);
-        } else if (currentTime > audioDuration) {
-          setAudioDuration(currentTime + 1);
-        }
-      }
-    }
-  };
-
-  const handleAudioEnded = () => {
-    setAudioPlaying(false);
-
-    // For WebM files, get the final duration when playback ends
-    if (audioPlayerRef.current) {
-      const finalTime = audioPlayerRef.current.currentTime;
-      setAudioDuration(finalTime);
-      setAudioCurrentTime(0);
-    } else {
-      setAudioCurrentTime(0);
-    }
-  };
-
-  const handleAudioError = (e) => {
-    const error = e.target.error;
-    let errorMessage = "Unknown audio error";
-    if (error) {
-      switch (error.code) {
-        case 1:
-          errorMessage = "Audio loading was aborted";
-          break;
-        case 2:
-          errorMessage = "Network error occurred while loading audio";
-          break;
-        case 3:
-          errorMessage = "Audio decoding error - file may be corrupted";
-          break;
-        case 4:
-          errorMessage = "Audio format not supported by browser";
-          break;
-        default:
-          errorMessage = `Audio error (code: ${error.code})`;
-      }
-    }
-
-    setAudioLoadingState("error");
-    setAudioLoaded(false);
-    alert(`Error loading audio: ${errorMessage}`);
-  };
 
   // File validation
   const validateFile = (file) => {
@@ -1250,37 +1141,30 @@ export default function NewPatientEncounterPage() {
     handleRecordingFileUpload(file);
   };
 
-  // Audio control functions
-  const playAudio = async () => {
-    if (audioPlayerRef.current && audioLoaded) {
-      try {
-        await audioPlayerRef.current.play();
-        setAudioPlaying(true);
-      } catch (error) {
-        console.error("Error playing audio:", error);
-        alert(`Error playing audio: ${error.message}`);
+  // Audio error handler
+  const handleAudioError = (e) => {
+    const error = e?.target?.error;
+    let errorMessage = "Unknown audio error";
+    if (error) {
+      switch (error.code) {
+        case 1:
+          errorMessage = "Audio loading was aborted";
+          break;
+        case 2:
+          errorMessage = "Network error occurred while loading audio";
+          break;
+        case 3:
+          errorMessage = "Audio decoding error - file may be corrupted";
+          break;
+        case 4:
+          errorMessage = "Audio format not supported by browser";
+          break;
+        default:
+          errorMessage = `Audio error (code: ${error.code})`;
       }
     }
-  };
-
-  const pauseAudio = () => {
-    if (audioPlayerRef.current) {
-      audioPlayerRef.current.pause();
-      setAudioPlaying(false);
-    }
-  };
-
-  const seekAudio = (time) => {
-    if (audioPlayerRef.current && audioLoaded) {
-      // For WebM files with invalid duration, allow seeking within reasonable bounds
-      const maxSeekTime = isFinite(audioDuration)
-        ? audioDuration
-        : recordingDuration || time;
-      const seekTime = Math.min(time, maxSeekTime);
-
-      audioPlayerRef.current.currentTime = seekTime;
-      setAudioCurrentTime(seekTime);
-    }
+    console.error(`Error loading audio: ${errorMessage}`, error);
+    alert(`Error loading audio: ${errorMessage}`);
   };
 
   // Start recording
@@ -2077,83 +1961,16 @@ export default function NewPatientEncounterPage() {
                             )}
                           </p>
 
-                          {/* Audio Player Controls - Hidden during upload/loading */}
+                          {/* Audio Player - Simple native player with download button */}
                           {!isLoading && recordingFileMetadata?.signedUrl && (
-                            <div className="mt-4 flex items-center gap-2 flex-wrap">
-                              <audio
-                                ref={audioPlayerRef}
+                            <div className="mt-4">
+                              <AudioPlayer 
                                 src={recordingFileMetadata.signedUrl}
-                                onLoadStart={handleAudioLoadStart}
-                                onLoadedMetadata={handleAudioLoadedMetadata}
-                                onTimeUpdate={handleAudioTimeUpdate}
-                                onEnded={handleAudioEnded}
                                 onError={handleAudioError}
-                                preload="metadata"
-                                style={{ display: "none" }}
+                                filename={recordingFileMetadata?.name || "recording.webm"}
+                                maxWidth="500px"
+                                size="sm"
                               />
-
-                              <button
-                                type="button"
-                                onClick={playAudio}
-                                disabled={
-                                  audioPlaying || audioLoadingState !== "loaded"
-                                }
-                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                ▶️ Play
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={pauseAudio}
-                                disabled={!audioPlaying}
-                                className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                ⏸️ Pause
-                              </button>
-
-                              <input
-                                type="range"
-                                min={0}
-                                max={
-                                  isFinite(audioDuration) && audioDuration > 0
-                                    ? audioDuration
-                                    : recordingFileMetadata.duration || 100
-                                }
-                                step={0.1}
-                                value={audioCurrentTime}
-                                onChange={(e) =>
-                                  seekAudio(parseFloat(e.target.value))
-                                }
-                                className="w-32 md:w-48"
-                                disabled={audioLoadingState !== "loaded"}
-                              />
-
-                              <span className="text-xs text-gray-700 font-mono min-w-[80px] text-right">
-                                {formatDuration(audioCurrentTime)} /{" "}
-                                {formatDuration(
-                                  isFinite(audioDuration)
-                                    ? audioDuration
-                                    : recordingFileMetadata.duration || 0
-                                )}
-                              </span>
-
-                              {/* Status indicator */}
-                              <span className="text-xs">
-                                {audioLoadingState === "loading" && (
-                                  <span className="text-orange-600">
-                                    🔄 Loading...
-                                  </span>
-                                )}
-                                {audioLoadingState === "loaded" && (
-                                  <span className="text-green-600">
-                                    ✅ Ready
-                                  </span>
-                                )}
-                                {audioLoadingState === "error" && (
-                                  <span className="text-red-600">❌ Error</span>
-                                )}
-                              </span>
                             </div>
                           )}
                         </div>

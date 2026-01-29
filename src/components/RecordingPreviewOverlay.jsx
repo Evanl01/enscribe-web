@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import * as format from "@/utils/format.js";
+import AudioPlayer from "@/components/AudioPlayer.jsx";
 
 export default function RecordingPreviewOverlay({
   selectedRecording,
@@ -13,10 +14,6 @@ export default function RecordingPreviewOverlay({
   const navigate = useNavigate();
 
   if (!selectedRecording) return null;
-
-  const getRecordingName = (path) => {
-    return path?.split("/").pop() || "unknown";
-  };
 
   const formatFileSize = (bytes) => {
     if (!bytes) return "Unknown size";
@@ -70,7 +67,7 @@ export default function RecordingPreviewOverlay({
         </div>
         
         <div style={{ marginBottom: "20px" }}>
-          <h3 ><strong>Name:</strong> {getRecordingName(selectedRecording.path)}</h3>
+          <h3 ><strong>Name:</strong> {format.extractRecordingFilenameFromPath(selectedRecording.path)}</h3>
           {/* <p><strong>File Path:</strong> {selectedRecording.path}</p> */}
           <p><strong>Size:</strong> {formatFileSize(selectedRecording.size)}</p>
           <p><strong>Created:</strong> {selectedRecording.created_at ? format.formatTimestamp(selectedRecording.created_at) : "Unknown"}</p>
@@ -104,22 +101,10 @@ export default function RecordingPreviewOverlay({
               <p style={{ margin: 0 }}>Loading audio player...</p>
             </div>
           ) : recordingData && recordingData.recording_file_signed_url ? (
-            <div>
-              {/* <div style={{ marginBottom: "15px", textAlign: "center" }}>
-                <p style={{ margin: 0, fontWeight: "bold", color: "#333" }}>Audio Player</p>
-              </div> */}
-              <audio 
-                controls 
-                style={{ width: "100%"}}
-                preload="metadata"
-              >
-                <source src={recordingData.recording_file_signed_url} type="audio/mpeg" />
-                <source src={recordingData.recording_file_signed_url} type="audio/wav" />
-                <source src={recordingData.recording_file_signed_url} type="audio/ogg" />
-                <source src={recordingData.recording_file_signed_url} type="audio/webm" />
-                Your browser does not support the audio element.
-              </audio>
-            </div>
+            <AudioPlayer 
+              src={recordingData.recording_file_signed_url}
+              filename={format.extractRecordingFilenameFromPath(selectedRecording.path)}
+            />
           ) : (
             <div style={{ textAlign: "center", color: "#ef4444" }}>
               <p style={{ margin: 0 }}>

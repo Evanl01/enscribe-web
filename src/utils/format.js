@@ -145,6 +145,11 @@ export const formatFileSize = (bytes) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+// Extract filename from path (e.g., "/folder/file.webm" -> "file.webm")
+export const extractRecordingFilenameFromPath = (path) => {
+    return path?.split("/").pop() || "recording.webm";
+};
+
 // Format SOAP section as HTML with bold and bullet structure
 export const formatMarkdownText = (key, value, level = 0, fontSize = null) => {
     // Helper to wrap text in larger font if requested
