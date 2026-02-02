@@ -1402,23 +1402,12 @@ export default function NewPatientEncounterPage() {
 
         // Now proceed with the API call using recording_file_path
         const payload = { recording_file_path: recording_file_path };
-        console.log('[promptLLM] Calling LLM API with fetchWithRefreshRetry (Tier 3)...');
-        const apiResult = await api.fetchWithRefreshRetry("/api/prompt-llm", {
+        console.log('[promptLLM] Calling LLM API with fetchWithAuthValidation...');
+        const response = await api.fetchWithAuthValidation("/api/prompt-llm", {
           method: "POST",
           body: JSON.stringify(payload),
         });
 
-        if (!apiResult.success) {
-          setIsProcessing(false);
-          const errorMessage = `Authentication failed: ${apiResult.error}`;
-          setCurrentStatus({
-            status: "error",
-            message: errorMessage,
-          });
-          throw new Error(errorMessage);
-        }
-
-        const response = apiResult.response;
         if (!response.ok) {
           setIsProcessing(false);
 

@@ -452,6 +452,70 @@ export const checkJWTValidity = async () => {
   }
 };
 
+// Check auth with retry: validates JWT, on 401 attempts refresh, returns whether user is authenticated
+// This is a pre-validation approach (validates before making the actual request)
+export const checkAuthWithRetry = async () => {
+  const jwt = getJWT();
+  if (!jwt) {
+    return { valid: false, requiresLogin: true, error: 'No JWT found' };
+  }
+  
+  const makeValidityRequest = async (token) => {
+    return fetch(`${API_BASE}/api/auth`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action: 'check-validity' }),
+    });
+  };
+
+  try {
+    // First attempt with current JWT
+    let response = await makeValidityRequest(jwt);
+    
+    // If unauthorized (401), try to refresh the token
+    if (response.status === 401) {
+      console.log('[Auth] JWT invalid, attempting refresh...');
+      const refreshResult = await refreshSession();
+      
+      if (refreshResult.success) {
+        console.log('[Auth] Token refreshed successfully');
+        return { 
+          valid: true, 
+          refreshed: true,
+          data: { valid: true, message: 'Token refreshed successfully' }
+        };
+      }
+      
+      // Refresh failed, user needs to login
+      console.warn('[Auth] Token refresh failed:', refreshResult.error);
+      return { 
+        valid: false, 
+        requiresLogin: true,
+        error: `Token invalid and refresh failed: ${refreshResult.error}`,
+        refreshAttempted: true
+      };
+    }
+    
+    // Token was valid on first try
+    if (!response.ok) {
+      return { 
+        valid: false, 
+        requiresLogin: true,
+        error: `HTTP ${response.status}: ${response.statusText}`
+      };
+    }
+    
+    const data = await response.json();
+    return { valid: data.valid || false, data };
+    
+  } catch (error) {
+    return { valid: false, requiresLogin: true, error: error.message };
+  }
+};
+
 // Check auth with refresh retry: validates JWT via fetchWithRefreshRetry (Tier 3)
 // On 401: automatically refreshes token and retries
 // Returns: { valid: boolean, data?: object, requiresLogin?: boolean, error?: string, status?: number }
@@ -499,7 +563,7 @@ export const checkAuthWithRefreshRetry = async () => {
 // Fetch with automatic auth validation: pre-validates JWT, refreshes if needed, then makes request
 export const fetchWithAuthValidation = async (input, init = {}) => {
   // First, validate and refresh auth if necessary
-  const authCheck = await checkAuthWithRefreshRetry();
+  const authCheck = await checkAuthWithRetry();
 
   if (!authCheck.valid) {
     throw new Error(authCheck.error || 'Authentication failed. Please log in again.');
