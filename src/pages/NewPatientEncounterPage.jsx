@@ -1148,22 +1148,24 @@ export default function NewPatientEncounterPage() {
     if (error) {
       switch (error.code) {
         case 1:
-          errorMessage = "Audio loading was aborted";
+          errorMessage = "Audio playback was aborted by user. Please try again.";
           break;
         case 2:
-          errorMessage = "Network error occurred while loading audio";
+          errorMessage = "Network error: Could not load audio file. Please check your internet connection and try again.";
           break;
         case 3:
-          errorMessage = "Audio decoding error - file may be corrupted";
+          errorMessage = "Audio format not supported or file is corrupted. Try uploading a different format (MP3, WAV, OGG, WebM, M4A).";
           break;
         case 4:
-          errorMessage = "Audio format not supported by browser";
+          errorMessage = "Audio file format not supported by your browser. The server may not be responding correctly.";
           break;
         default:
-          errorMessage = `Audio error (code: ${error.code})`;
+          errorMessage = `Audio error code ${error.code}: ${error.message || 'Unknown error'}`;
       }
+    } else if (e?.target) {
+      errorMessage = "Failed to load audio file. It may be inaccessible or corrupted.";
     }
-    console.error(`Error loading audio: ${errorMessage}`, error);
+    console.error(`[AudioPlayer Error] ${errorMessage}`, { errorCode: error?.code, error, event: e });
     alert(`Error loading audio: ${errorMessage}`);
   };
 
@@ -1408,23 +1410,27 @@ export default function NewPatientEncounterPage() {
           body: JSON.stringify(payload),
         });
 
-        if (!response.ok) {
+        if (!response || !response.ok) {
           setIsProcessing(false);
 
-          let errorMessage = `Server error: ${response.status} ${response.statusText}`;
+          let errorMessage = response 
+            ? `Server error: ${response.status} ${response.statusText}`
+            : 'No response from server - connection failed';
           setCurrentStatus({
             status: "error",
             message: errorMessage,
           });
           try {
-            const errorData = await response.text();
-            if (errorData) {
-              errorMessage += `\n${errorData}`;
-              // Update status with more detailed error message
-              setCurrentStatus({
-                status: "error",
-                message: errorMessage,
-              });
+            if (response) {
+              const errorData = await response.text();
+              if (errorData) {
+                errorMessage += `\n${errorData}`;
+                // Update status with more detailed error message
+                setCurrentStatus({
+                  status: "error",
+                  message: errorMessage,
+                });
+              }
             }
           } catch (e) {
             console.warn("Could not read error response body:", e);
@@ -1958,7 +1964,6 @@ export default function NewPatientEncounterPage() {
                                 onError={handleAudioError}
                                 filename={recordingFileMetadata?.name || "recording.webm"}
                                 maxWidth="500px"
-                                size="sm"
                               />
                             </div>
                           )}

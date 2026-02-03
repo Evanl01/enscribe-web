@@ -7,6 +7,23 @@ export default function AudioPlayer({
   filename = "recording.webm",
   maxWidth = "100%"
 }) {
+  // Detect audio type from filename or URL
+  const getAudioType = (url) => {
+    if (!url) return "audio/mpeg";
+    const ext = url.toLowerCase().split('.').pop()?.split('?')[0] || '';
+    const typeMap = {
+      'mp3': 'audio/mpeg',
+      'wav': 'audio/wav',
+      'webm': 'audio/webm',
+      'ogg': 'audio/ogg',
+      'm4a': 'audio/mp4',
+      'mp4': 'audio/mp4'
+    };
+    return typeMap[ext] || 'audio/mpeg';
+  };
+
+  const audioType = getAudioType(src);
+
   return (
     <div style={{ 
       padding: "4px", 
@@ -22,7 +39,7 @@ export default function AudioPlayer({
           preload="metadata"
           onError={onError}
         >
-          <source src={src} type="audio/mpeg" />
+          <source src={src} type={audioType} />
           Your browser does not support the audio element.
         </audio>
         

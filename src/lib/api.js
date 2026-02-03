@@ -654,6 +654,7 @@ export const fetchWithRefreshRetry = async (url, options = {}) => {
         success: false,
         error: refreshResult.error,
         status: 401,
+        response: null,
       };
     }
 
@@ -675,6 +676,7 @@ export const fetchWithRefreshRetry = async (url, options = {}) => {
         success: false,
         error: `HTTP ${response.status}: ${response.statusText}`,
         status: response.status,
+        response: null,
       };
     }
 
@@ -683,6 +685,7 @@ export const fetchWithRefreshRetry = async (url, options = {}) => {
     // Network error - no HTTP status available
     return {
       success: false,
+      response: null,
       error: error.message || 'Unknown error occurred',
       // status is undefined for network errors
     };
