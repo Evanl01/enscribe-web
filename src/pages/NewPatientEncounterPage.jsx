@@ -6,6 +6,7 @@ import * as ui from "@/utils/ui.js";
 import * as format from "@/utils/format.js";
 import * as validation from "@/utils/validation.js";
 import * as background from "@/utils/background.js";
+import { isNetworkError } from "@/utils/errors.js";
 import { STORAGE_KEYS, parseStorageValue } from "@/utils/storageConfig.js";
 import PatientEncounterPreviewOverlay from "@/components/PatientEncounterPreviewOverlay";
 import AudioPlayer from "@/components/AudioPlayer.jsx";
@@ -19,8 +20,8 @@ export default function NewPatientEncounterPage() {
 
   // Check for recordingPath URL parameter (from query string)
   const urlParams = new URLSearchParams(window.location.search);
-  const urlRecordingPath = urlParams.get('recordingPath');
-  
+  const urlRecordingPath = urlParams.get("recordingPath");
+
   // State for URL-loaded recording
   const [urlRecordingData, setUrlRecordingData] = useState(null);
   const [loadingUrlRecording, setLoadingUrlRecording] = useState(false);
@@ -69,7 +70,7 @@ export default function NewPatientEncounterPage() {
   };
 
   // LocalStorage keys now use centralized config from storageConfig.js
-    // Load recording file from localStorage on page mount only
+  // Load recording file from localStorage on page mount only
   useEffect(() => {
     // Only load from localStorage if there's no URL recording being processed
     if (!urlRecordingPath && !loadingUrlRecording) {
@@ -79,27 +80,45 @@ export default function NewPatientEncounterPage() {
 
   // Restore from localStorage on mount and enable Section 2 if any field exists
   useEffect(() => {
-    console.log('[NewPatientEncounterPage] Restoring form data from localStorage...');
-    
-    const name = parseStorageValue(STORAGE_KEYS.newPatientEncounter.patientEncounterName);
-    const transcript = parseStorageValue(STORAGE_KEYS.newPatientEncounter.transcript);
-    const subjective = parseStorageValue(STORAGE_KEYS.newPatientEncounter.soapSubjective);
-    const objective = parseStorageValue(STORAGE_KEYS.newPatientEncounter.soapObjective);
-    const assessment = parseStorageValue(STORAGE_KEYS.newPatientEncounter.soapAssessment);
+    console.log(
+      "[NewPatientEncounterPage] Restoring form data from localStorage...",
+    );
+
+    const name = parseStorageValue(
+      STORAGE_KEYS.newPatientEncounter.patientEncounterName,
+    );
+    const transcript = parseStorageValue(
+      STORAGE_KEYS.newPatientEncounter.transcript,
+    );
+    const subjective = parseStorageValue(
+      STORAGE_KEYS.newPatientEncounter.soapSubjective,
+    );
+    const objective = parseStorageValue(
+      STORAGE_KEYS.newPatientEncounter.soapObjective,
+    );
+    const assessment = parseStorageValue(
+      STORAGE_KEYS.newPatientEncounter.soapAssessment,
+    );
     const plan = parseStorageValue(STORAGE_KEYS.newPatientEncounter.soapPlan);
-    const billing = parseStorageValue(STORAGE_KEYS.newPatientEncounter.billingSuggestion);
-    
-    console.log('[NewPatientEncounterPage] Raw localStorage values:', {
-      patientEncounterName: name ? `"${name.substring(0, 50)}..."` : 'empty',
-      transcript: transcript ? `"${transcript.substring(0, 50)}..."` : 'empty',
-      soapSubjective: subjective ? `"${subjective.substring(0, 50)}..."` : 'empty',
-      soapObjective: objective ? `"${objective.substring(0, 50)}..."` : 'empty',
-      soapAssessment: assessment ? `"${assessment.substring(0, 50)}..."` : 'empty',
-      soapPlan: plan ? `"${plan.substring(0, 50)}..."` : 'empty',
-      billingSuggestion: billing ? `"${billing.substring(0, 50)}..."` : 'empty',
+    const billing = parseStorageValue(
+      STORAGE_KEYS.newPatientEncounter.billingSuggestion,
+    );
+
+    console.log("[NewPatientEncounterPage] Raw localStorage values:", {
+      patientEncounterName: name ? `"${name.substring(0, 50)}..."` : "empty",
+      transcript: transcript ? `"${transcript.substring(0, 50)}..."` : "empty",
+      soapSubjective: subjective
+        ? `"${subjective.substring(0, 50)}..."`
+        : "empty",
+      soapObjective: objective ? `"${objective.substring(0, 50)}..."` : "empty",
+      soapAssessment: assessment
+        ? `"${assessment.substring(0, 50)}..."`
+        : "empty",
+      soapPlan: plan ? `"${plan.substring(0, 50)}..."` : "empty",
+      billingSuggestion: billing ? `"${billing.substring(0, 50)}..."` : "empty",
     });
-    
-    console.log('[NewPatientEncounterPage] Restored fields (has content):', {
+
+    console.log("[NewPatientEncounterPage] Restored fields (has content):", {
       patientEncounterName: name.length > 0,
       transcript: transcript.length > 0,
       soapSubjective: subjective.length > 0,
@@ -108,17 +127,20 @@ export default function NewPatientEncounterPage() {
       soapPlan: plan.length > 0,
       billingSuggestion: billing.length > 0,
     });
-    
-    console.log('[NewPatientEncounterPage] About to set state with parsed values:', {
-      name: name.substring(0, 50),
-      transcript: transcript.substring(0, 50),
-      subjective: subjective.substring(0, 50),
-      objective: objective.substring(0, 50),
-      assessment: assessment.substring(0, 50),
-      plan: plan.substring(0, 50),
-      billing: billing.substring(0, 50),
-    });
-    
+
+    console.log(
+      "[NewPatientEncounterPage] About to set state with parsed values:",
+      {
+        name: name.substring(0, 50),
+        transcript: transcript.substring(0, 50),
+        subjective: subjective.substring(0, 50),
+        objective: objective.substring(0, 50),
+        assessment: assessment.substring(0, 50),
+        plan: plan.substring(0, 50),
+        billing: billing.substring(0, 50),
+      },
+    );
+
     setPatientEncounterName(name);
     setTranscript(transcript);
     setSoapSubjective(subjective);
@@ -126,11 +148,11 @@ export default function NewPatientEncounterPage() {
     setSoapAssessment(assessment);
     setSoapPlan(plan);
     setBillingSuggestion(billing);
-    
-    console.log('[NewPatientEncounterPage] State setters called');
-    
+
+    console.log("[NewPatientEncounterPage] State setters called");
+
     // If any field has data, enable section 2
-    const hasData = 
+    const hasData =
       name.trim() ||
       transcript.trim() ||
       subjective.trim() ||
@@ -138,17 +160,23 @@ export default function NewPatientEncounterPage() {
       assessment.trim() ||
       plan.trim() ||
       billing.trim();
-    
+
     if (hasData) {
-      console.log('[NewPatientEncounterPage] Found restored data, expanding Section 2');
+      console.log(
+        "[NewPatientEncounterPage] Found restored data, expanding Section 2",
+      );
       setSoapNoteRequested(true);
     } else {
-      console.log('[NewPatientEncounterPage] No saved form data found in localStorage');
+      console.log(
+        "[NewPatientEncounterPage] No saved form data found in localStorage",
+      );
     }
 
     // Mark restoration as complete - NOW auto-save useEffects can run
     setRestorationComplete(true);
-    console.log('[NewPatientEncounterPage] Restoration complete, auto-save effects enabled');
+    console.log(
+      "[NewPatientEncounterPage] Restoration complete, auto-save effects enabled",
+    );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle URL recording parameter
@@ -159,54 +187,72 @@ export default function NewPatientEncounterPage() {
         setLoadingUrlRecording(false);
         return;
       }
-      
+
       setLoadingUrlRecording(true);
       try {
         // Create signed URL for the recording using api singleton
-        const result = await api.fetchWithRefreshRetry('/api/recordings/create-signed-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: urlRecordingPath }),
-        });
+        const result = await api.fetchWithRefreshRetry(
+          "/api/recordings/create-signed-url",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: urlRecordingPath }),
+          },
+        );
 
         if (!result.success) {
-          console.error('Error creating signed URL for URL recording:', result.error);
-          alert('Failed to load recording from URL. Please try again or upload the file manually.');
+          console.error(
+            "Error creating signed URL for URL recording:",
+            result.error,
+          );
+          alert(
+            "Failed to load recording from URL. Please try again or upload the file manually.",
+          );
           setLoadingUrlRecording(false);
           return;
         }
 
         const response = result.response;
         if (!response.ok) {
-          console.error('Error creating signed URL for URL recording:', response.statusText);
-          alert('Failed to load recording from URL. Please try again or upload the file manually.');
+          console.error(
+            "Error creating signed URL for URL recording:",
+            response.statusText,
+          );
+          alert(
+            "Failed to load recording from URL. Please try again or upload the file manually.",
+          );
           setLoadingUrlRecording(false);
           return;
         }
 
         const signedUrlData = await response.json();
         if (!signedUrlData?.signedUrl) {
-          console.error('Error creating signed URL for URL recording: no signedUrl in response');
-          alert('Failed to load recording from URL. Please try again or upload the file manually.');
+          console.error(
+            "Error creating signed URL for URL recording: no signedUrl in response",
+          );
+          alert(
+            "Failed to load recording from URL. Please try again or upload the file manually.",
+          );
           setLoadingUrlRecording(false);
           return;
         }
         // Extract filename from path
-        const fileName = format.extractRecordingFilenameFromPath(urlRecordingPath);
-        
+        const fileName =
+          format.extractRecordingFilenameFromPath(urlRecordingPath);
+
         // Create metadata object similar to upload flow
         const metadata = {
           path: urlRecordingPath,
           signedUrl: signedUrlData.signedUrl,
           name: fileName,
           // Note: size and duration not available from URL, but path is most important
-          fromUrl: true // Flag to indicate this came from URL
+          fromUrl: true, // Flag to indicate this came from URL
         };
 
         // Store in localStorage like the upload flow does
         localStorage.setItem(
           STORAGE_KEYS.newPatientEncounter.recordingFileMetadata,
-          JSON.stringify(metadata)
+          JSON.stringify(metadata),
         );
 
         // Set both URL recording data and recordingFileMetadata for consistency
@@ -217,55 +263,108 @@ export default function NewPatientEncounterPage() {
         // User should stay on section 1 to see the loaded recording and click "Generate SOAP Note"
         setSoapNoteRequested(true);
         // Keep user on section 1 (upload) to see the loaded recording
-        
-        console.log('Loaded recording from URL and saved to localStorage:', {
+
+        console.log("Loaded recording from URL and saved to localStorage:", {
           path: urlRecordingPath,
           fileName,
           signedUrl: signedUrlData.signedUrl,
-          metadata
+          metadata,
         });
-        
       } catch (error) {
-        console.error('Error loading recording from URL:', error);
-        alert('Failed to load recording from URL. Please try again or upload the file manually.');
+        console.error("Error loading recording from URL:", error);
+        alert(
+          "Failed to load recording from URL. Please try again or upload the file manually.",
+        );
       } finally {
         setLoadingUrlRecording(false);
       }
     };
 
     loadRecordingFromUrl();
-  }, [urlRecordingPath, STORAGE_KEYS.newPatientEncounter.recordingFileMetadata]); // Remove supabase from dependency array since it's stable
+  }, [
+    urlRecordingPath,
+    STORAGE_KEYS.newPatientEncounter.recordingFileMetadata,
+  ]); // Remove supabase from dependency array since it's stable
 
   // Save to localStorage on change (with JSON stringify for proper serialization)
   // Only run AFTER restoration is complete to avoid overwriting with empty initial state
   useEffect(() => {
     if (!restorationComplete) return;
-    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.patientEncounterName, JSON.stringify(patientEncounterName));
-  }, [patientEncounterName, STORAGE_KEYS.newPatientEncounter.patientEncounterName, restorationComplete]);
+    localStorage.setItem(
+      STORAGE_KEYS.newPatientEncounter.patientEncounterName,
+      JSON.stringify(patientEncounterName),
+    );
+  }, [
+    patientEncounterName,
+    STORAGE_KEYS.newPatientEncounter.patientEncounterName,
+    restorationComplete,
+  ]);
   useEffect(() => {
     if (!restorationComplete) return;
-    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.transcript, JSON.stringify(transcript));
-  }, [transcript, STORAGE_KEYS.newPatientEncounter.transcript, restorationComplete]);
+    localStorage.setItem(
+      STORAGE_KEYS.newPatientEncounter.transcript,
+      JSON.stringify(transcript),
+    );
+  }, [
+    transcript,
+    STORAGE_KEYS.newPatientEncounter.transcript,
+    restorationComplete,
+  ]);
   useEffect(() => {
     if (!restorationComplete) return;
-    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.soapSubjective, JSON.stringify(soapSubjective));
-  }, [soapSubjective, STORAGE_KEYS.newPatientEncounter.soapSubjective, restorationComplete]);
+    localStorage.setItem(
+      STORAGE_KEYS.newPatientEncounter.soapSubjective,
+      JSON.stringify(soapSubjective),
+    );
+  }, [
+    soapSubjective,
+    STORAGE_KEYS.newPatientEncounter.soapSubjective,
+    restorationComplete,
+  ]);
   useEffect(() => {
     if (!restorationComplete) return;
-    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.soapObjective, JSON.stringify(soapObjective));
-  }, [soapObjective, STORAGE_KEYS.newPatientEncounter.soapObjective, restorationComplete]);
+    localStorage.setItem(
+      STORAGE_KEYS.newPatientEncounter.soapObjective,
+      JSON.stringify(soapObjective),
+    );
+  }, [
+    soapObjective,
+    STORAGE_KEYS.newPatientEncounter.soapObjective,
+    restorationComplete,
+  ]);
   useEffect(() => {
     if (!restorationComplete) return;
-    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.soapAssessment, JSON.stringify(soapAssessment));
-  }, [soapAssessment, STORAGE_KEYS.newPatientEncounter.soapAssessment, restorationComplete]);
+    localStorage.setItem(
+      STORAGE_KEYS.newPatientEncounter.soapAssessment,
+      JSON.stringify(soapAssessment),
+    );
+  }, [
+    soapAssessment,
+    STORAGE_KEYS.newPatientEncounter.soapAssessment,
+    restorationComplete,
+  ]);
   useEffect(() => {
     if (!restorationComplete) return;
-    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.soapPlan, JSON.stringify(soapPlan));
-  }, [soapPlan, STORAGE_KEYS.newPatientEncounter.soapPlan, restorationComplete]);
+    localStorage.setItem(
+      STORAGE_KEYS.newPatientEncounter.soapPlan,
+      JSON.stringify(soapPlan),
+    );
+  }, [
+    soapPlan,
+    STORAGE_KEYS.newPatientEncounter.soapPlan,
+    restorationComplete,
+  ]);
   useEffect(() => {
     if (!restorationComplete) return;
-    localStorage.setItem(STORAGE_KEYS.newPatientEncounter.billingSuggestion, JSON.stringify(billingSuggestion));
-  }, [billingSuggestion, STORAGE_KEYS.newPatientEncounter.billingSuggestion, restorationComplete]);
+    localStorage.setItem(
+      STORAGE_KEYS.newPatientEncounter.billingSuggestion,
+      JSON.stringify(billingSuggestion),
+    );
+  }, [
+    billingSuggestion,
+    STORAGE_KEYS.newPatientEncounter.billingSuggestion,
+    restorationComplete,
+  ]);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingDurationRef = useRef(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -298,9 +397,9 @@ export default function NewPatientEncounterPage() {
   const runStartupChecks = useCallback(async () => {
     try {
       const inc = await detectIncognitoMode();
-  const storage = await getStorageQuota();
-  // Check for server-visible refresh cookie (HttpOnly cookies not visible to JS)
-  const refreshCookieExists = await api.checkRefreshCookie();
+      const storage = await getStorageQuota();
+      // Check for server-visible refresh cookie (HttpOnly cookies not visible to JS)
+      const refreshCookieExists = await api.checkRefreshCookie();
 
       let lsOk = true;
       try {
@@ -371,48 +470,54 @@ export default function NewPatientEncounterPage() {
     }
   }, []);
 
-  const handleAuthError = useCallback((diagnosticData) => {
-    console.error(
-      "[handleAuthError] Authentication failed - diagnostic analysis:",
-      diagnosticData
-    );
+  const handleAuthError = useCallback(
+    (diagnosticData) => {
+      console.error(
+        "[handleAuthError] Authentication failed - diagnostic analysis:",
+        diagnosticData,
+      );
 
-    let errorMessage = "You must be logged in to upload recordings.";
+      let errorMessage = "You must be logged in to upload recordings.";
 
-    if (diagnosticData.isIncognito === "localhost-incognito") {
-      errorMessage =
-        "Your session has expired in incognito/private mode on localhost.\n\n" +
-        "Note: Localhost has relaxed incognito restrictions, but session tokens may still expire. " +
-        "Please log in again.";
-    } else if (
-      diagnosticData.isIncognito === true &&
-      diagnosticData.jwtPresent
-    ) {
-      errorMessage =
-        "Your session has expired in incognito/private mode.\n\n" +
-        "Incognito mode blocks refresh token cookies needed to maintain long sessions. " +
-        "Please log in again or use normal browsing mode for better session persistence.";
-    } else if (diagnosticData.isIncognito === true) {
-      errorMessage +=
-        "\n\nIncognito/Private mode detected. This may cause authentication issues due to restricted cookies and storage.";
-    } else if (diagnosticData.isIncognito === "localhost-normal") {
-      errorMessage +=
-        "\n\nRunning on localhost with relaxed incognito restrictions.";
-    } else if (!diagnosticData.jwtPresent) {
-      errorMessage += "\n\nPlease log in to continue.";
-    }
+      if (diagnosticData.isIncognito === "localhost-incognito") {
+        errorMessage =
+          "Your session has expired in incognito/private mode on localhost.\n\n" +
+          "Note: Localhost has relaxed incognito restrictions, but session tokens may still expire. " +
+          "Please log in again.";
+      } else if (
+        diagnosticData.isIncognito === true &&
+        diagnosticData.jwtPresent
+      ) {
+        errorMessage =
+          "Your session has expired in incognito/private mode.\n\n" +
+          "Incognito mode blocks refresh token cookies needed to maintain long sessions. " +
+          "Please log in again or use normal browsing mode for better session persistence.";
+      } else if (diagnosticData.isIncognito === true) {
+        errorMessage +=
+          "\n\nIncognito/Private mode detected. This may cause authentication issues due to restricted cookies and storage.";
+      } else if (diagnosticData.isIncognito === "localhost-normal") {
+        errorMessage +=
+          "\n\nRunning on localhost with relaxed incognito restrictions.";
+      } else if (!diagnosticData.jwtPresent) {
+        errorMessage += "\n\nPlease log in to continue.";
+      }
 
-    alert(errorMessage);
-    api.handleSignOut();
-    navigate("/login");
-    return;
-  }, [navigate]);
+      alert(errorMessage);
+      api.handleSignOut();
+      navigate("/login");
+      return;
+    },
+    [navigate],
+  );
   useEffect(() => {
     isMountedRef.current = true;
-    
+
     runStartupChecks().then((diagnosticData) => {
-      console.log("[NewPatientEncounter] Startup checks complete:", diagnosticData);
-      
+      console.log(
+        "[NewPatientEncounter] Startup checks complete:",
+        diagnosticData,
+      );
+
       // Only show error if incognito mode is detected (storage actually restricted)
       // Don't block on other checks - they're just informational
       if (diagnosticData.isIncognito === true) {
@@ -420,7 +525,7 @@ export default function NewPatientEncounterPage() {
         handleAuthError(diagnosticData);
         return;
       }
-      
+
       // Log other conditions for debugging but don't block
       if (diagnosticData.isIncognito === "localhost-incognito") {
         console.warn("[NewPatientEncounter] Localhost incognito detected");
@@ -432,7 +537,7 @@ export default function NewPatientEncounterPage() {
         console.warn("[NewPatientEncounter] JWT not present");
       }
     });
-    
+
     return () => {
       isMountedRef.current = false;
     };
@@ -446,7 +551,9 @@ export default function NewPatientEncounterPage() {
   const fileInputRef = useRef(null);
 
   const getLocalStorageRecordingFile = async () => {
-    const metadataStr = localStorage.getItem(STORAGE_KEYS.newPatientEncounter.recordingFileMetadata);
+    const metadataStr = localStorage.getItem(
+      STORAGE_KEYS.newPatientEncounter.recordingFileMetadata,
+    );
     if (!metadataStr) return null;
 
     try {
@@ -455,15 +562,24 @@ export default function NewPatientEncounterPage() {
       // Get a signed URL from backend using refresh-retry auth
       try {
         console.log("localStorage Metadata:", metadata);
-        console.log("[getLocalStorageRecordingFile] Fetching signed URL for stored recording:", metadata.path);
-        const result = await api.fetchWithRefreshRetry('/api/recordings/create-signed-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: metadata.path }),
-        });
+        console.log(
+          "[getLocalStorageRecordingFile] Fetching signed URL for stored recording:",
+          metadata.path,
+        );
+        const result = await api.fetchWithRefreshRetry(
+          "/api/recordings/create-signed-url",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: metadata.path }),
+          },
+        );
 
         if (!result.success) {
-          console.warn("Error creating signed URL for stored recording:", result.error);
+          console.warn(
+            "Error creating signed URL for stored recording:",
+            result.error,
+          );
           // Return metadata without signed URL
           return {
             ...metadata,
@@ -477,7 +593,10 @@ export default function NewPatientEncounterPage() {
 
         const response = result.response;
         if (!response.ok) {
-          console.warn("Error creating signed URL for stored recording:", response.statusText);
+          console.warn(
+            "Error creating signed URL for stored recording:",
+            response.statusText,
+          );
           // Return metadata without signed URL
           return {
             ...metadata,
@@ -496,7 +615,7 @@ export default function NewPatientEncounterPage() {
           "signedUrl:",
           signedUrlData.signedUrl,
           "isuploading:",
-          isUploading
+          isUploading,
         );
         return {
           ...metadata,
@@ -595,10 +714,13 @@ export default function NewPatientEncounterPage() {
 
   // Poll for file accessibility on Supabase (verify upload is complete and accessible)
   const pollForFileAccessibility = async (signedUrl, maxWaitMs = 5000) => {
-    console.log('[pollForFileAccessibility] Starting poll for URL accessibility:', {
-      url: signedUrl.substring(0, 50) + '...',
-      maxWaitMs
-    });
+    console.log(
+      "[pollForFileAccessibility] Starting poll for URL accessibility:",
+      {
+        url: signedUrl.substring(0, 50) + "...",
+        maxWaitMs,
+      },
+    );
 
     return new Promise((resolve) => {
       let isResolved = false;
@@ -612,7 +734,9 @@ export default function NewPatientEncounterPage() {
 
           // Check if we've exceeded timeout
           if (elapsedMs > maxWaitMs) {
-            console.warn('[pollForFileAccessibility] Timeout reached, stopping poll');
+            console.warn(
+              "[pollForFileAccessibility] Timeout reached, stopping poll",
+            );
             clearInterval(poll);
             if (!isResolved) {
               isResolved = true;
@@ -622,27 +746,32 @@ export default function NewPatientEncounterPage() {
           }
 
           // Attempt to fetch file headers to verify accessibility
-          fetch(signedUrl, { method: 'HEAD' })
+          fetch(signedUrl, { method: "HEAD" })
             .then((response) => {
-              console.log('[pollForFileAccessibility] HEAD request returned:', {
+              console.log("[pollForFileAccessibility] HEAD request returned:", {
                 status: response.status,
                 ok: response.ok,
-                elapsedMs
+                elapsedMs,
               });
 
               if (response.ok && !isResolved) {
                 isResolved = true;
                 clearInterval(poll);
                 clearTimeout(initialDelay);
-                console.log('[pollForFileAccessibility] File is accessible, stopping poll');
+                console.log(
+                  "[pollForFileAccessibility] File is accessible, stopping poll",
+                );
                 resolve(true);
               }
             })
             .catch((error) => {
-              console.log('[pollForFileAccessibility] HEAD request failed (expected during polling):', {
-                error: error.message,
-                elapsedMs
-              });
+              console.log(
+                "[pollForFileAccessibility] HEAD request failed (expected during polling):",
+                {
+                  error: error.message,
+                  elapsedMs,
+                },
+              );
               // Continue polling on error
             });
         }, pollIntervalMs);
@@ -821,38 +950,52 @@ export default function NewPatientEncounterPage() {
   const uploadWithReactiveAuth = async (filePath, file, onProgress) => {
     try {
       // Step 1: Get signed URL from backend using Tier 3 (refresh-retry) auth
-      console.log('[uploadWithReactiveAuth] Step 1: Fetching signed URL...');
-      const result = await api.fetchWithRefreshRetry('/api/recordings/create-signed-upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: filePath }),
-      });
-      
+      console.log("[uploadWithReactiveAuth] Step 1: Fetching signed URL...");
+      const result = await api.fetchWithRefreshRetry(
+        "/api/recordings/create-signed-upload-url",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: filePath }),
+        },
+      );
+
       if (!result.success) {
         throw new Error(`Failed to get signed URL: ${result.error}`);
       }
-      
+
       const signedUrlResponse = result.response;
       if (!signedUrlResponse.ok) {
         const errorData = await signedUrlResponse.json().catch(() => ({}));
-        throw new Error(`Failed to get signed URL: ${errorData.message || signedUrlResponse.statusText}`);
+        throw new Error(
+          `Failed to get signed URL: ${errorData.message || signedUrlResponse.statusText}`,
+        );
       }
-      
+
       const { signedUrl, path } = await signedUrlResponse.json();
-      console.log('[uploadWithReactiveAuth] Step 1 complete, got signed URL');
-      
+      console.log("[uploadWithReactiveAuth] Step 1 complete, got signed URL");
+
       // Step 2: Upload file to signed URL using XHR with progress tracking
-      console.log('[uploadWithReactiveAuth] Step 2: Uploading to signed URL via XHR...');
+      console.log(
+        "[uploadWithReactiveAuth] Step 2: Uploading to signed URL via XHR...",
+      );
       await api.xhrUploadToSignedUrl(signedUrl, file, onProgress);
-      console.log('[uploadWithReactiveAuth] Step 2 complete, upload successful');
-      
+      console.log(
+        "[uploadWithReactiveAuth] Step 2 complete, upload successful",
+      );
+
       return { data: { path, id: filePath }, error: null };
     } catch (error) {
       // Handle specific error: file too large (413)
       const message = error?.message;
-      if (message?.includes("exceeded the maximum allowed size") || message?.includes("File too large")) {
+      if (
+        message?.includes("exceeded the maximum allowed size") ||
+        message?.includes("File too large")
+      ) {
         const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
-        const fileTooLargeError = new Error(`File too large (${fileSizeMB}MB). Maximum allowed size is 100MB.`);
+        const fileTooLargeError = new Error(
+          `File too large (${fileSizeMB}MB). Maximum allowed size is 100MB.`,
+        );
         return {
           data: null,
           error: fileTooLargeError,
@@ -870,7 +1013,7 @@ export default function NewPatientEncounterPage() {
   // Helper to reset file input
   const resetFileInput = () => {
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
@@ -881,7 +1024,10 @@ export default function NewPatientEncounterPage() {
     // Validate file type and size FIRST, before any async operations
     const validationError = validateFile(file);
     if (validationError) {
-      console.error('[handleRecordingFileUpload] Validation failed:', validationError);
+      console.error(
+        "[handleRecordingFileUpload] Validation failed:",
+        validationError,
+      );
       alert(validationError);
       resetFileInput();
       return;
@@ -893,7 +1039,10 @@ export default function NewPatientEncounterPage() {
       if (duration > 40 * 60) {
         // 40 minutes
         const durationWarning = `Recording duration (${Math.round(duration / 60)} minutes) exceeds typical 40-minute limit`;
-        console.warn('[handleRecordingFileUpload] Duration warning:', durationWarning);
+        console.warn(
+          "[handleRecordingFileUpload] Duration warning:",
+          durationWarning,
+        );
         // Proceed with upload - file size enforcement takes precedence
       }
       console.log("File metadata:", {
@@ -949,7 +1098,7 @@ export default function NewPatientEncounterPage() {
             .map(function (c) {
               return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
             })
-            .join("")
+            .join(""),
         );
         const jwtPayload = JSON.parse(jsonPayload);
 
@@ -961,7 +1110,7 @@ export default function NewPatientEncounterPage() {
         email = jwtPayload.email;
         if (!user || !user.id || !email) {
           throw new Error(
-            "Invalid user information: " + JSON.stringify({ user, email })
+            "Invalid user information: " + JSON.stringify({ user, email }),
           );
         }
       } catch (e) {
@@ -989,28 +1138,43 @@ export default function NewPatientEncounterPage() {
 
       // Define progress callback to update UI with upload percentage
       const onProgress = (progress) => {
-        console.log('[handleRecordingFileUpload] onProgress callback triggered:', progress);
-        setCurrentStatus(prev => {
+        console.log(
+          "[handleRecordingFileUpload] onProgress callback triggered:",
+          progress,
+        );
+        setCurrentStatus((prev) => {
           const newStatus = {
             ...prev,
             progress: progress.percent || 0,
             message: "Uploading recording",
           };
-          console.log('[handleRecordingFileUpload] setCurrentStatus with:', newStatus);
+          console.log(
+            "[handleRecordingFileUpload] setCurrentStatus with:",
+            newStatus,
+          );
           return newStatus;
         });
       };
 
       // Attempt upload with auth validation and progress tracking
-      console.log("[handleRecordingFileUpload] Calling uploadWithReactiveAuth (Tier 2)...");
-      const uploadResult = await uploadWithReactiveAuth(filePath, file, onProgress);
-      console.log("[handleRecordingFileUpload] uploadWithReactiveAuth returned:", {
-        hasError: !!uploadResult?.error,
-        hasData: !!uploadResult?.data,
-        requiresLogin: uploadResult?.requiresLogin,
-        errorMessage: uploadResult?.error?.message,
-        dataPath: uploadResult?.data?.path,
-      });
+      console.log(
+        "[handleRecordingFileUpload] Calling uploadWithReactiveAuth (Tier 2)...",
+      );
+      const uploadResult = await uploadWithReactiveAuth(
+        filePath,
+        file,
+        onProgress,
+      );
+      console.log(
+        "[handleRecordingFileUpload] uploadWithReactiveAuth returned:",
+        {
+          hasError: !!uploadResult?.error,
+          hasData: !!uploadResult?.data,
+          requiresLogin: uploadResult?.requiresLogin,
+          errorMessage: uploadResult?.error?.message,
+          dataPath: uploadResult?.data?.path,
+        },
+      );
 
       setIsSaving(false);
 
@@ -1023,7 +1187,7 @@ export default function NewPatientEncounterPage() {
 
       const { data, error } = uploadResult;
 
-      console.log('[handleRecordingFileUpload] uploadResult.data:', {
+      console.log("[handleRecordingFileUpload] uploadResult.data:", {
         path: data?.path,
         id: data?.id,
         fullPath: data?.fullPath,
@@ -1035,10 +1199,13 @@ export default function NewPatientEncounterPage() {
           status: "error",
           message: errorMessage,
         });
-        
+
         // Provide better error messaging
         if (uploadResult?.isFileTooLarge) {
-          alert(errorMessage + "\n\nPlease record a shorter session or use a higher quality setting to reduce file size.");
+          alert(
+            errorMessage +
+              "\n\nPlease record a shorter session or use a higher quality setting to reduce file size.",
+          );
         } else {
           alert("Error uploading recording: " + errorMessage);
         }
@@ -1047,44 +1214,69 @@ export default function NewPatientEncounterPage() {
 
       // Clear old recording file from localStorage and reset local variables
       localStorage.removeItem(STORAGE_KEYS.newPatientEncounter.recordingFile);
-      localStorage.removeItem(STORAGE_KEYS.newPatientEncounter.recordingFileMetadata);
+      localStorage.removeItem(
+        STORAGE_KEYS.newPatientEncounter.recordingFileMetadata,
+      );
       setRecordingFile(null);
       setRecordingDuration(0);
       setRecordingFileMetadata(null);
 
       // Get signed URL for the uploaded file to enable playback
-      console.log('[handleRecordingFileUpload] Getting signed URL for playback...');
+      console.log(
+        "[handleRecordingFileUpload] Getting signed URL for playback...",
+      );
       let signedUrl = null;
       try {
-        const result = await api.fetchWithRefreshRetry('/api/recordings/create-signed-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: data.path }),
-        });
+        const result = await api.fetchWithRefreshRetry(
+          "/api/recordings/create-signed-url",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: data.path }),
+          },
+        );
 
         if (!result.success) {
-          console.warn('[handleRecordingFileUpload] Failed to get signed URL:', result.error);
+          console.warn(
+            "[handleRecordingFileUpload] Failed to get signed URL:",
+            result.error,
+          );
         } else {
           const response = result.response;
           if (!response.ok) {
-            console.warn('[handleRecordingFileUpload] Failed to get signed URL:', response.statusText);
+            console.warn(
+              "[handleRecordingFileUpload] Failed to get signed URL:",
+              response.statusText,
+            );
           } else {
             const signedUrlData = await response.json();
-            console.log('[handleRecordingFileUpload] Received signed URL data:', signedUrlData);
+            console.log(
+              "[handleRecordingFileUpload] Received signed URL data:",
+              signedUrlData,
+            );
             signedUrl = signedUrlData.signedUrl;
-            console.log('[handleRecordingFileUpload] Got signed URL, polling for accessibility...');
-            
+            console.log(
+              "[handleRecordingFileUpload] Got signed URL, polling for accessibility...",
+            );
+
             // Poll to verify file is accessible before proceeding
             const isAccessible = await pollForFileAccessibility(signedUrl);
             if (isAccessible) {
-              console.log('[handleRecordingFileUpload] File confirmed accessible');
+              console.log(
+                "[handleRecordingFileUpload] File confirmed accessible",
+              );
             } else {
-              console.warn('[handleRecordingFileUpload] File accessibility poll timed out (may still work)');
+              console.warn(
+                "[handleRecordingFileUpload] File accessibility poll timed out (may still work)",
+              );
             }
           }
         }
       } catch (signedUrlError) {
-        console.warn('[handleRecordingFileUpload] Error getting signed URL:', signedUrlError);
+        console.warn(
+          "[handleRecordingFileUpload] Error getting signed URL:",
+          signedUrlError,
+        );
       }
 
       // Save enhanced metadata for later use - use upload response + our calculations
@@ -1101,21 +1293,25 @@ export default function NewPatientEncounterPage() {
       console.log("File uploaded successfully - metadata being saved:", {
         metadataPath: metadata.path,
         pathLength: metadata.path?.length,
-        pathParts: metadata.path?.split('/'),
+        pathParts: metadata.path?.split("/"),
       });
 
       // Store with new key name
       localStorage.setItem(
         STORAGE_KEYS.newPatientEncounter.recordingFileMetadata,
-        JSON.stringify(metadata)
+        JSON.stringify(metadata),
       );
-      
+
       // Verify what was actually saved
-      const savedMetadata = JSON.parse(localStorage.getItem(STORAGE_KEYS.newPatientEncounter.recordingFileMetadata));
+      const savedMetadata = JSON.parse(
+        localStorage.getItem(
+          STORAGE_KEYS.newPatientEncounter.recordingFileMetadata,
+        ),
+      );
       console.log("Metadata saved to localStorage - verification:", {
         savedPath: savedMetadata?.path,
         pathLength: savedMetadata?.path?.length,
-        pathParts: savedMetadata?.path?.split('/'),
+        pathParts: savedMetadata?.path?.split("/"),
       });
 
       // Update local state
@@ -1130,7 +1326,7 @@ export default function NewPatientEncounterPage() {
       setIsProcessing(false);
       console.error("Error processing or uploading audio file:", error);
       alert(
-        "Error processing or uploading audio file. Please ensure it's a valid audio file."
+        "Error processing or uploading audio file. Please ensure it's a valid audio file.",
       );
     }
   };
@@ -1143,29 +1339,73 @@ export default function NewPatientEncounterPage() {
 
   // Audio error handler
   const handleAudioError = (e) => {
+    console.log("[AudioPlayer Error] Full event object:", {
+      eventType: e?.type,
+      eventTarget: e?.target?.tagName,
+      targetError: e?.target?.error,
+      errorCode: e?.target?.error?.code,
+      errorMessage: e?.target?.error?.message,
+      rawError: e?.target?.error,
+      fullEvent: e,
+    });
+
     const error = e?.target?.error;
     let errorMessage = "Unknown audio error";
     if (error) {
       switch (error.code) {
         case 1:
-          errorMessage = "Audio playback was aborted by user. Please try again.";
+          errorMessage =
+            "Audio playback was aborted by user. Please try again.";
           break;
         case 2:
-          errorMessage = "Network error: Could not load audio file. Please check your internet connection and try again.";
+          errorMessage =
+            "Network error: Could not load audio file. Please check your internet connection and try again.";
           break;
         case 3:
-          errorMessage = "Audio format not supported or file is corrupted. Try uploading a different format (MP3, WAV, OGG, WebM, M4A).";
+          errorMessage =
+            "Audio format not supported or file is corrupted. Try uploading a different format (MP3, WAV, WebM). \n\nNote: Safari does not support WebM format, try a different browser.";
           break;
         case 4:
-          errorMessage = "Audio file format not supported by your browser. The server may not be responding correctly.";
+          errorMessage =
+            "Audio file format not supported by your browser. The server may not be responding correctly.";
           break;
         default:
-          errorMessage = `Audio error code ${error.code}: ${error.message || 'Unknown error'}`;
+          errorMessage = `Audio error code ${error.code}: ${error.message || "Unknown error"}`;
       }
     } else if (e?.target) {
-      errorMessage = "Failed to load audio file. It may be inaccessible or corrupted.";
+      errorMessage =
+        "Failed to load audio file. It may be inaccessible or corrupted.\n\n Note: Safari does not support WebM format, try a different browser.";
+      // Comprehensive fallback logging for mobile debugging
+      console.error(`[AudioPlayer FALLBACK] No error code found - full diagnostics:`, {
+        eventType: e?.type,
+        eventTarget: {
+          tagName: e?.target?.tagName,
+          src: e?.target?.src,
+          currentSrc: e?.target?.currentSrc,
+          networkState: e?.target?.networkState,
+          readyState: e?.target?.readyState,
+          buffered: e?.target?.buffered?.length,
+          paused: e?.target?.paused,
+          ended: e?.target?.ended,
+          seeking: e?.target?.seeking,
+        },
+        errorObject: e?.target?.error ? {
+          code: e?.target?.error?.code,
+          message: e?.target?.error?.message,
+          name: e?.target?.error?.name,
+          keys: Object.keys(e?.target?.error || {}),
+        } : 'NULL - THIS IS THE PROBLEM',
+        allTargetKeys: Object.keys(e?.target || {}),
+        eventKeys: Object.keys(e || {}),
+        fullTarget: JSON.stringify(e?.target, null, 2).substring(0, 500),
+        fullEvent: JSON.stringify(e, null, 2).substring(0, 500),
+      });
     }
-    console.error(`[AudioPlayer Error] ${errorMessage}`, { errorCode: error?.code, error, event: e });
+    console.error(`[AudioPlayer Error] ${errorMessage}`, {
+      errorCode: error?.code,
+      error,
+      event: e,
+    });
     alert(`Error loading audio: ${errorMessage}`);
   };
 
@@ -1175,7 +1415,9 @@ export default function NewPatientEncounterPage() {
     // Pre-flight: Validate JWT before starting recording with refresh retry
     const authCheck = await api.checkAuthWithRefreshRetry();
     if (!authCheck.valid) {
-      alert("Your session has expired. Please log in again to continue recording.");
+      alert(
+        "Your session has expired. Please log in again to continue recording.",
+      );
       return;
     }
 
@@ -1187,7 +1429,9 @@ export default function NewPatientEncounterPage() {
 
     // Clear previous recording file and remove from localStorage
     localStorage.removeItem(STORAGE_KEYS.newPatientEncounter.recordingFile);
-    localStorage.removeItem(STORAGE_KEYS.newPatientEncounter.recordingFileMetadata);
+    localStorage.removeItem(
+      STORAGE_KEYS.newPatientEncounter.recordingFileMetadata,
+    );
     setRecordingFile(null);
     setRecordingFileMetadata(null);
     // Reset recording duration to 0 when starting new recording
@@ -1328,19 +1572,27 @@ export default function NewPatientEncounterPage() {
     }
 
     // Set up periodic refresh every 60 minutes (3600 seconds)
-    refreshIntervalRef.current = setInterval(async () => {
-      console.log("[Recording] In-flight JWT refresh triggered");
-      try {
-        const result = await api.refreshSession();
-        if (result && result.success) {
-          console.log("[Recording] JWT refreshed successfully during recording");
-        } else {
-          console.warn("[Recording] JWT refresh failed:", result?.error || "Unknown error");
+    refreshIntervalRef.current = setInterval(
+      async () => {
+        console.log("[Recording] In-flight JWT refresh triggered");
+        try {
+          const result = await api.refreshSession();
+          if (result && result.success) {
+            console.log(
+              "[Recording] JWT refreshed successfully during recording",
+            );
+          } else {
+            console.warn(
+              "[Recording] JWT refresh failed:",
+              result?.error || "Unknown error",
+            );
+          }
+        } catch (error) {
+          console.warn("[Recording] JWT refresh error:", error);
         }
-      } catch (error) {
-        console.warn("[Recording] JWT refresh error:", error);
-      }
-    }, 60 * 60 * 1000); // 60 minutes in milliseconds
+      },
+      60 * 60 * 1000,
+    ); // 60 minutes in milliseconds
 
     // Cleanup when recording stops or component unmounts
     return () => {
@@ -1351,11 +1603,9 @@ export default function NewPatientEncounterPage() {
     };
   }, [isRecording]);
 
-  // Generate SOAP note
-  // Update the generateSoapNote function to handle recorded audio upload
+  // Generate SOAP note using job-based API
   const generateSoapNote = async () => {
     // Clear localStorage and reset textareas
-    // Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
     setPatientEncounterName("");
     setTranscript("");
     setSoapSubjective("");
@@ -1364,259 +1614,216 @@ export default function NewPatientEncounterPage() {
     setSoapPlan("");
     setBillingSuggestion("");
 
+    // Clear any previous job IDs
+    localStorage.removeItem(STORAGE_KEYS.jobs.promptLlmJobId);
+    localStorage.removeItem(STORAGE_KEYS.jobs.promptLlmJobStatus);
+
     setSoapNoteRequested(true);
     setIsProcessing(true);
     setActiveSection("review");
     setCurrentStatus({
-      status: "processing",
-      message: "Starting transcription...",
+      status: "pending",
+      message: "Creating job...",
     });
 
+    const abortController = new AbortController();
     let timeoutId;
-    const TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+    const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+    
     try {
       timeoutId = setTimeout(() => {
+        abortController.abort();
         setIsProcessing(false);
         setCurrentStatus({
           status: "error",
-          message: "Request timed out after 3 minutes. Please try again.",
+          message: "Job processing timeout after 10 minutes. Please try again.",
         });
-        alert("Request timed out after 3 minutes. Please try again.");
+        alert("Job processing timeout after 10 minutes. Please try again.");
       }, TIMEOUT_MS);
+
       try {
         let recording_file_path = "";
 
         // Check if we have recording file metadata (works for both upload and URL flows)
-        const metadataStr = localStorage.getItem(STORAGE_KEYS.newPatientEncounter.recordingFileMetadata);
+        const metadataStr = localStorage.getItem(
+          STORAGE_KEYS.newPatientEncounter.recordingFileMetadata,
+        );
         if (metadataStr) {
-          // File was uploaded or loaded from URL - use existing metadata
           const metadata = JSON.parse(metadataStr);
           if (!metadata.path) {
             throw new Error("Audio file path missing in metadata.");
           }
           recording_file_path = metadata.path;
-          console.log("Using recording path from localStorage:", recording_file_path, metadata.fromUrl ? "(from URL)" : "(from upload)");
+          console.log(
+            "[generateSoapNote] Using recording path:",
+            recording_file_path,
+            metadata.fromUrl ? "(from URL)" : "(from upload)",
+          );
         } else {
           throw new Error(
-            "No audio file found. Please upload or record audio first."
+            "No audio file found. Please upload or record audio first.",
           );
         }
 
-        // Now proceed with the API call using recording_file_path
-        const payload = { recording_file_path: recording_file_path };
-        console.log('[promptLLM] Calling LLM API with fetchWithAuthValidation...');
-        const response = await api.fetchWithAuthValidation("/api/prompt-llm", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
+        // Step 1: Create job
+        console.log("[generateSoapNote] Creating job...");
+        const jobResponse = await api.createPromptLlmJob(recording_file_path);
+        const jobId = jobResponse.id;
 
-        if (!response || !response.ok) {
-          setIsProcessing(false);
+        console.log("[generateSoapNote] Job created:", jobId);
+        localStorage.setItem(STORAGE_KEYS.jobs.promptLlmJobId, jobId);
+        localStorage.setItem(
+          STORAGE_KEYS.jobs.promptLlmJobStatus,
+          jobResponse.status,
+        );
 
-          let errorMessage = response 
-            ? `Server error: ${response.status} ${response.statusText}`
-            : 'No response from server - connection failed';
-          setCurrentStatus({
-            status: "error",
-            message: errorMessage,
-          });
+        // Step 2: Poll for status with exponential backoff on failures
+        let pollInterval = 10000; // 10 seconds
+        const MAX_BACKOFF = 60000; // 60 seconds
+        let backoffMultiplier = 1; // Reset to 1 on each successful poll
+        let consecutiveErrors = 0;
+        let pollCount = 0;
+
+        while (true) {
+          if (abortController.signal.aborted) {
+            console.log("[generateSoapNote] Polling aborted by user");
+            throw new Error("Job polling aborted");
+          }
+
           try {
-            if (response) {
-              const errorData = await response.text();
-              if (errorData) {
-                errorMessage += `\n${errorData}`;
-                // Update status with more detailed error message
-                setCurrentStatus({
-                  status: "error",
-                  message: errorMessage,
-                });
+            pollCount++;
+            console.log(`[generateSoapNote] Poll #${pollCount} - Starting poll for jobId: ${jobId} - Next interval: ${pollInterval}ms`);
+            const statusResponse = await api.getPromptLlmJobStatus(jobId);
+
+            console.log(`[generateSoapNote] Poll #${pollCount} - Response received - Status: ${statusResponse.status}`);
+            if (statusResponse.error_message) {
+              console.log(`[generateSoapNote] Poll #${pollCount} - Error message: ${statusResponse.error_message}`);
+            }
+
+            localStorage.setItem(
+              STORAGE_KEYS.jobs.promptLlmJobStatus,
+              statusResponse.status,
+            );
+
+            // Reset backoff on successful poll
+            if (consecutiveErrors > 0) {
+              console.log(`[generateSoapNote] Poll #${pollCount} - Resetting backoff (was ${consecutiveErrors} consecutive errors)`);
+            }
+            backoffMultiplier = 1;
+            consecutiveErrors = 0;
+
+            // Update UI with current status
+            const statusMessage = {
+              pending: "Waiting to start...",
+              transcribing: "Transcribing audio...",
+              generating: "Generating SOAP note...",
+              complete: "Processing complete, fetching result...",
+              error: statusResponse.error_message || "Job failed",
+            };
+
+            setCurrentStatus({
+              status: statusResponse.status,
+              message: statusMessage[statusResponse.status] || statusResponse.status,
+            });
+
+            // Handle completion
+            if (statusResponse.status === "complete") {
+              console.log(`[generateSoapNote] Poll #${pollCount} - Job complete! Fetching full result with ?includeResult=true`);
+              const resultResponse = await api.getPromptLlmJobResult(jobId);
+              console.log(`[generateSoapNote] Poll #${pollCount} - Result fetched successfully`);
+              await processJobResult(resultResponse);
+              setIsProcessing(false);
+              console.log(`[generateSoapNote] Poll #${pollCount} - SOAP note processing complete`);
+              break;
+            }
+
+            // Handle error
+            if (statusResponse.status === "error") {
+              console.error(`[generateSoapNote] Poll #${pollCount} - Job error state received`);
+              throw new Error(
+                statusResponse.error_message || "Job failed with unknown error",
+              );
+            }
+
+            // Wait before next poll (10 seconds default, or with backoff)
+            console.log(`[generateSoapNote] Poll #${pollCount} - Waiting ${pollInterval}ms before next poll (status: ${statusResponse.status})`);
+            await new Promise((resolve) => {
+              const pollTimeout = setTimeout(resolve, pollInterval);
+              abortController.signal.addEventListener(
+                "abort",
+                () => clearTimeout(pollTimeout),
+              );
+            });
+          } catch (pollError) {
+            // Categorize error and handle accordingly
+            const networkErr = isNetworkError(pollError);
+            const is401 = pollError.message?.includes('401') || pollError.message?.includes('Unauthorized');
+            const is404 = pollError.message?.includes('404') || pollError.message?.includes('not found');
+            const isJobError = pollError.message?.includes('Job') && pollError.message?.includes('failed');
+
+            console.warn(`[generateSoapNote] Poll #${pollCount} - Error: ${pollError.message} (network=${networkErr}, 401=${is401}, 404=${is404}, jobError=${isJobError})`);
+
+            // 401 Unauthorized: Refresh JWT and retry immediately
+            if (is401) {
+              console.log(`[generateSoapNote] Poll #${pollCount} - 401 Unauthorized: Attempting JWT refresh`);
+              try {
+                await api.refreshSession();
+                console.log(`[generateSoapNote] Poll #${pollCount} - JWT refreshed successfully, retrying immediately`);
+                backoffMultiplier = 1;
+                consecutiveErrors = 0;
+                continue; // Retry immediately without backoff
+              } catch (refreshError) {
+                console.error(`[generateSoapNote] Poll #${pollCount} - JWT refresh failed:`, refreshError);
+                throw new Error('Session expired. Please log in again.');
               }
             }
-          } catch (e) {
-            console.warn("Could not read error response body:", e);
-          }
-          throw new Error(errorMessage);
-        }
 
-        if (!response.body || !response.body.getReader) {
-          throw new Error("No readable response body received from server");
-        }
-
-        // Rest of the streaming response handling remains the same...
-        const reader = response.body.getReader();
-        let buffer = "";
-        let receivedComplete = false; // Track if we received a completion signal
-        
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            // Stream ended - check if we received a completion signal
-            if (!receivedComplete) {
-              throw new Error("Stream ended unexpectedly without completion signal");
+            // 404 or job error: Stop immediately (non-retryable)
+            if (is404 || isJobError) {
+              console.error(`[generateSoapNote] Poll #${pollCount} - Non-retryable error: ${pollError.message}`);
+              throw pollError;
             }
-            break;
-          }
-          
-          const chunk = new TextDecoder().decode(value);
-          buffer += chunk;
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-          for (const line of lines) {
-            console.log("Received line:", line);
-            if (line.trim()) {
-              try {
-                let jsonData;
-                if (line.startsWith("data: ")) {
-                  const jsonString = line.substring(6);
-                  if (jsonString.trim()) {
-                    jsonData = JSON.parse(jsonString);
-                  }
-                } else {
-                  jsonData = JSON.parse(line);
-                }
-                if (jsonData) {
-                  setCurrentStatus(jsonData);
-                  if (jsonData.status === "error") {
-                    setCurrentStatus(jsonData);
-                    setIsProcessing(false);
-                    throw new Error(
-                      jsonData.message || "Streamed error received"
-                    );
-                  }
-                  if (
-                    jsonData.status === "transcription complete" &&
-                    jsonData.data?.transcript
-                  ) {
-                    console.log('[generateSoapNote] Received transcript:', jsonData.data.transcript.substring(0, 100));
-                    setTranscript(jsonData.data.transcript);
-                    // Store transcript immediately to localStorage
-                    localStorage.setItem(
-                      STORAGE_KEYS.newPatientEncounter.transcript,
-                      JSON.stringify(jsonData.data.transcript)
-                    );
-                    console.log('[generateSoapNote] Stored transcript to LS:', STORAGE_KEYS.newPatientEncounter.transcript.substring(0, 50));
-                  }
-                  if (
-                    jsonData.status === "soap note complete" &&
-                    jsonData.data
-                  ) {
-                    receivedComplete = true; // Mark as completed
-                    let noteObj = {};
-                    let billingObj = {};
-                    try {
-                      // Parse the JSON string (no code block markers)
-                      const parsed =
-                        typeof jsonData.data === "string"
-                          ? JSON.parse(jsonData.data)
-                          : jsonData.data;
-                      console.log(
-                        "[generateSoapNote]: Parsed SOAP note data:",
-                        parsed
-                      );
 
-                      noteObj = parsed.soap_note || {};
-                      billingObj = parsed.billing || {};
+            // Network errors: Use exponential backoff with 10 retries for bad mobile connections
+            if (networkErr) {
+              consecutiveErrors++;
+              console.warn(`[generateSoapNote] Poll #${pollCount} - Network error (attempt #${consecutiveErrors}/10): ${pollError.message}`);
 
-                      // Set textareas directly
-                      let soapSubjectiveText =
-                        typeof noteObj.subjective === "string"
-                          ? noteObj.subjective
-                          : format.printJsonObject(noteObj.subjective);
-                      let soapObjectiveText =
-                        typeof noteObj.objective === "string"
-                          ? noteObj.objective
-                          : format.printJsonObject(noteObj.objective);
-                      let soapAssessmentText =
-                        typeof noteObj.assessment === "string"
-                          ? noteObj.assessment
-                          : format.printJsonObject(noteObj.assessment);
-                      let soapPlanText =
-                        typeof noteObj.plan === "string"
-                          ? noteObj.plan
-                          : format.printJsonObject(noteObj.plan);
-                      setSoapSubjective(soapSubjectiveText);
-                      setSoapObjective(soapObjectiveText);
-                      setSoapAssessment(soapAssessmentText);
-                      setSoapPlan(soapPlanText);
-
-                      // Format billing suggestion for textarea (as readable text)
-                      // let billingText = "";
-                      // if (billingObj.icd10_codes) {
-                      //   billingText += `ICD10 Codes: ${billingObj.icd10_codes.join(
-                      //     ", "
-                      //   )}\n`;
-                      // }
-                      // if (billingObj.billing_code) {
-                      //   billingText += `CPT/Billing Code: ${billingObj.billing_code}\n`;
-                      // }
-                      // if (billingObj.additional_inquiries) {
-                      //   billingText += `Additional Inquiries: ${billingObj.additional_inquiries}\n`;
-                      // }
-                      let billingText =
-                        typeof billingObj === "string"
-                          ? billingObj
-                          : format.printJsonObject(billingObj);
-                      setBillingSuggestion(billingText.trim());
-
-                      setIsProcessing(false);
-                      // Set localStorage with new keys (with JSON stringify for proper serialization)
-                      // Note: transcript is already stored immediately when "transcription complete" arrives,
-                      // so we only store the SOAP-generated fields here
-                      console.log('[generateSoapNote] About to store to LS:', {
-                        soapSubjectiveText: soapSubjectiveText.substring(0, 50),
-                        soapObjectiveText: soapObjectiveText.substring(0, 50),
-                        soapAssessmentText: soapAssessmentText.substring(0, 50),
-                        soapPlanText: soapPlanText.substring(0, 50),
-                        billingText: billingText.trim().substring(0, 50),
-                        patientEncounterName,
-                      });
-                      localStorage.setItem(
-                        STORAGE_KEYS.newPatientEncounter.patientEncounterName,
-                        JSON.stringify(patientEncounterName)
-                      );
-                      localStorage.setItem(
-                        STORAGE_KEYS.newPatientEncounter.soapSubjective,
-                        JSON.stringify(soapSubjectiveText)
-                      );
-                      localStorage.setItem(
-                        STORAGE_KEYS.newPatientEncounter.soapObjective,
-                        JSON.stringify(soapObjectiveText)
-                      );
-                      localStorage.setItem(
-                        STORAGE_KEYS.newPatientEncounter.soapAssessment,
-                        JSON.stringify(soapAssessmentText)
-                      );
-                      localStorage.setItem(STORAGE_KEYS.newPatientEncounter.soapPlan, JSON.stringify(soapPlanText));
-                      localStorage.setItem(
-                        STORAGE_KEYS.newPatientEncounter.billingSuggestion,
-                        JSON.stringify(billingText.trim())
-                      );
-                    } catch (e) {
-                      console.error(
-                        "[generateSoapNote] CRITICAL: Failed to parse SOAP note JSON:",
-                        e.message,
-                        "Raw data:",
-                        jsonData.data
-                      );
-                      console.error("[generateSoapNote] Error stack:", e.stack);
-                      setSoapSubjective("");
-                      setSoapObjective("");
-                      setSoapAssessment("");
-                      setSoapPlan("");
-                      setBillingSuggestion("");
-                    }
-                  }
-                }
-              } catch (e) {
+              if (consecutiveErrors >= 10) {
+                console.error(`[generateSoapNote] Poll #${pollCount} - GIVING UP after ${consecutiveErrors} network errors`);
                 throw new Error(
-                  `Failed to parse JSON line: ${line}\nError: ${e.message}`
+                  `Failed to reach server after ${consecutiveErrors} attempts. Please check your connection.`,
                 );
               }
+
+              // Apply exponential backoff for network errors
+              if (consecutiveErrors > 1) {
+                backoffMultiplier = Math.min(
+                  backoffMultiplier * 2,
+                  MAX_BACKOFF / 10000,
+                );
+                pollInterval = 10000 * backoffMultiplier;
+                console.log(`[generateSoapNote] Poll #${pollCount} - Applying exponential backoff: multiplier=${backoffMultiplier}, nextInterval=${pollInterval}ms`);
+              }
+
+              // Wait before retrying network error
+              console.log(`[generateSoapNote] Poll #${pollCount} - Waiting ${pollInterval}ms before network retry`);
+              await new Promise((resolve) => {
+                const pollTimeout = setTimeout(resolve, pollInterval);
+                abortController.signal.addEventListener(
+                  "abort",
+                  () => clearTimeout(pollTimeout),
+                );
+              });
+            } else {
+              // Unknown error: Stop immediately
+              console.error(`[generateSoapNote] Poll #${pollCount} - Unknown error (non-retryable): ${pollError.message}`);
+              throw pollError;
             }
           }
         }
       } catch (error) {
-        console.error("[generateSoapNote]: Error", error);
+        console.error("[generateSoapNote] Error:", error);
         const errorMsg =
           typeof error === "string" ? error : error?.message || "";
 
@@ -1625,6 +1832,7 @@ export default function NewPatientEncounterPage() {
           navigate("/login");
           return;
         }
+
         alert(`Error generating SOAP note: ${errorMsg}`);
         setCurrentStatus({
           status: "error",
@@ -1635,13 +1843,109 @@ export default function NewPatientEncounterPage() {
       clearTimeout(timeoutId);
     } catch (error) {
       clearTimeout(timeoutId);
-      console.error("[generateSoapNote]: Error", error);
+      console.error("[generateSoapNote] Outer error:", error);
       alert(`Error generating SOAP note: ${error.message}`);
       setCurrentStatus({
         status: "error",
         message: `Failed to process recording: ${error.message}`,
       });
       setIsProcessing(false);
+    }
+  };
+
+  // Process job result and set state
+  const processJobResult = async (resultResponse) => {
+    console.log("[processJobResult] Processing result:", resultResponse);
+
+    let noteObj = {};
+    let billingObj = {};
+
+    try {
+      // Parse SOAP note if it's a string
+      const parsed =
+        typeof resultResponse.soap_note === "string"
+          ? JSON.parse(resultResponse.soap_note)
+          : resultResponse.soap_note || {};
+
+      console.log("[processJobResult] Parsed SOAP note:", parsed);
+
+      noteObj = parsed.soap_note || parsed || {};
+      billingObj = parsed.billing || {};
+
+      // Extract transcript
+      const transcriptText = resultResponse.transcript_text || "";
+      setTranscript(transcriptText);
+      localStorage.setItem(
+        STORAGE_KEYS.newPatientEncounter.transcript,
+        JSON.stringify(transcriptText),
+      );
+
+      // Format SOAP note fields
+      let soapSubjectiveText =
+        typeof noteObj.subjective === "string"
+          ? noteObj.subjective
+          : format.printJsonObject(noteObj.subjective);
+      let soapObjectiveText =
+        typeof noteObj.objective === "string"
+          ? noteObj.objective
+          : format.printJsonObject(noteObj.objective);
+      let soapAssessmentText =
+        typeof noteObj.assessment === "string"
+          ? noteObj.assessment
+          : format.printJsonObject(noteObj.assessment);
+      let soapPlanText =
+        typeof noteObj.plan === "string"
+          ? noteObj.plan
+          : format.printJsonObject(noteObj.plan);
+
+      setSoapSubjective(soapSubjectiveText);
+      setSoapObjective(soapObjectiveText);
+      setSoapAssessment(soapAssessmentText);
+      setSoapPlan(soapPlanText);
+
+      // Format billing
+      let billingText =
+        typeof billingObj === "string"
+          ? billingObj
+          : format.printJsonObject(billingObj);
+      setBillingSuggestion(billingText.trim());
+
+      // Store to localStorage
+      localStorage.setItem(
+        STORAGE_KEYS.newPatientEncounter.soapSubjective,
+        JSON.stringify(soapSubjectiveText),
+      );
+      localStorage.setItem(
+        STORAGE_KEYS.newPatientEncounter.soapObjective,
+        JSON.stringify(soapObjectiveText),
+      );
+      localStorage.setItem(
+        STORAGE_KEYS.newPatientEncounter.soapAssessment,
+        JSON.stringify(soapAssessmentText),
+      );
+      localStorage.setItem(
+        STORAGE_KEYS.newPatientEncounter.soapPlan,
+        JSON.stringify(soapPlanText),
+      );
+      localStorage.setItem(
+        STORAGE_KEYS.newPatientEncounter.billingSuggestion,
+        JSON.stringify(billingText.trim()),
+      );
+
+      setCurrentStatus({
+        status: "complete",
+        message: "SOAP note generated successfully",
+      });
+    } catch (e) {
+      console.error("[processJobResult] Parse error:", e);
+      setSoapSubjective("");
+      setSoapObjective("");
+      setSoapAssessment("");
+      setSoapPlan("");
+      setBillingSuggestion("");
+      throw new Error(
+        `Failed to parse SOAP note result: ${e.message}`,
+      );
     }
   };
 
@@ -1659,7 +1963,7 @@ export default function NewPatientEncounterPage() {
     if (!billingSuggestion.trim()) missingFields.push("Billing Suggestion");
     if (missingFields.length > 0) {
       alert(
-        "Required field(s): " + missingFields.map((f) => `${f}`).join(", ")
+        "Required field(s): " + missingFields.map((f) => `${f}`).join(", "),
       );
       return;
     }
@@ -1703,7 +2007,7 @@ export default function NewPatientEncounterPage() {
 
       // Get recording_file_path from localStorage metadata
       const recordingFileMetadata = localStorage.getItem(
-        STORAGE_KEYS.newPatientEncounter.recordingFileMetadata
+        STORAGE_KEYS.newPatientEncounter.recordingFileMetadata,
       );
       let recording_file_path = "";
 
@@ -1730,14 +2034,16 @@ export default function NewPatientEncounterPage() {
       };
 
       console.log("Saving patient encounter with data:", payload);
-      console.log('[savePatientEncounter] Calling API with fetchWithRefreshRetry (Tier 3)...');
+      console.log(
+        "[savePatientEncounter] Calling API with fetchWithRefreshRetry (Tier 3)...",
+      );
       const apiResult = await api.fetchWithRefreshRetry(
         "/api/patient-encounters/complete",
         {
           method: "POST",
           body: JSON.stringify(payload),
           cache: "no-store", // Always fetch fresh data, never use cache
-        }
+        },
       );
 
       if (!apiResult.success) {
@@ -1767,7 +2073,9 @@ export default function NewPatientEncounterPage() {
         return;
       }
       // Clear localStorage for these fields after successful save
-      Object.values(STORAGE_KEYS.newPatientEncounter).forEach(key => localStorage.removeItem(key));
+      Object.values(STORAGE_KEYS.newPatientEncounter).forEach((key) =>
+        localStorage.removeItem(key),
+      );
       // Navigate back to dashboard
       setRecordingFile(null);
       setRecordingFileMetadata(null);
@@ -1873,16 +2181,16 @@ export default function NewPatientEncounterPage() {
                                 ? isWakeLockActive
                                   ? "Active"
                                   : isWakeLockPending
-                                  ? "Pending"
-                                  : "Inactive"
+                                    ? "Pending"
+                                    : "Inactive"
                                 : "Unsupported"}
                               {process.env.NODE_ENV !== "production" && (
                                 <span className="sr-only">{` wk: ${
                                   isWakeLockActive
                                     ? "A"
                                     : isWakeLockPending
-                                    ? "P"
-                                    : "N"
+                                      ? "P"
+                                      : "N"
                                 }`}</span>
                               )}
                             </span>
@@ -1913,9 +2221,13 @@ export default function NewPatientEncounterPage() {
               </div>
 
               {(() => {
-                if (recordingFileMetadata || isUploading || loadingUrlRecording) {
+                if (
+                  recordingFileMetadata ||
+                  isUploading ||
+                  loadingUrlRecording
+                ) {
                   const isLoading = isUploading || loadingUrlRecording;
-                  
+
                   return (
                     <div
                       className={`mt-6 p-4 rounded-lg border ${
@@ -1932,18 +2244,19 @@ export default function NewPatientEncounterPage() {
                             }`}
                           >
                             {isLoading
-                              ? loadingUrlRecording 
-                                ? "Loading recording from URL..." 
+                              ? loadingUrlRecording
+                                ? "Loading recording from URL..."
                                 : "Uploading recording..."
-                              : recordingFileMetadata?.fromUrl 
+                              : recordingFileMetadata?.fromUrl
                                 ? "Recording Loaded from URL"
                                 : "Recording Ready"}
                           </p>
-                          {isLoading && currentStatus?.progress !== undefined && (
-                            <p className="text-sm text-gray-600 mt-1">
-                              Progress: {currentStatus.progress}%
-                            </p>
-                          )}
+                          {isLoading &&
+                            currentStatus?.progress !== undefined && (
+                              <p className="text-sm text-gray-600 mt-1">
+                                Progress: {currentStatus.progress}%
+                              </p>
+                            )}
                           <p
                             className={`text-sm ${
                               isLoading ? "text-gray-500" : "text-green-600"
@@ -1951,18 +2264,20 @@ export default function NewPatientEncounterPage() {
                             data-path={recordingFileMetadata?.path || ""}
                           >
                             {recordingFileMetadata?.name || "recording.webm"}
-                            {recordingFileMetadata?.size && (
-                              ` (${((recordingFileMetadata.size || 0) / (1024 * 1024)).toFixed(1)}MB)`
-                            )}
+                            {recordingFileMetadata?.size &&
+                              ` (${((recordingFileMetadata.size || 0) / (1024 * 1024)).toFixed(1)}MB)`}
                           </p>
 
                           {/* Audio Player - Simple native player with download button */}
                           {!isLoading && recordingFileMetadata?.signedUrl && (
                             <div className="mt-4">
-                              <AudioPlayer 
+                              <AudioPlayer
                                 src={recordingFileMetadata.signedUrl}
                                 onError={handleAudioError}
-                                filename={recordingFileMetadata?.name || "recording.webm"}
+                                filename={
+                                  recordingFileMetadata?.name ||
+                                  "recording.webm"
+                                }
                                 maxWidth="500px"
                               />
                             </div>
@@ -1971,14 +2286,19 @@ export default function NewPatientEncounterPage() {
 
                         <button
                           onClick={generateSoapNote}
-                          disabled={isProcessing || isUploading || loadingUrlRecording || !recordingFileMetadata}
+                          disabled={
+                            isProcessing ||
+                            isUploading ||
+                            loadingUrlRecording ||
+                            !recordingFileMetadata
+                          }
                           className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50"
                         >
                           {isProcessing
                             ? "Processing..."
                             : loadingUrlRecording
-                            ? "Loading Recording..."
-                            : "Generate SOAP Note"}
+                              ? "Loading Recording..."
+                              : "Generate SOAP Note"}
                         </button>
                       </div>
                     </div>
@@ -2043,7 +2363,10 @@ export default function NewPatientEncounterPage() {
                   </div>
                   <div className="text-sm">
                     {currentStatus.message}
-                    {currentStatus.progress !== undefined && currentStatus.progress !== null ? ` – ${currentStatus.progress}%` : ""}
+                    {currentStatus.progress !== undefined &&
+                    currentStatus.progress !== null
+                      ? ` – ${currentStatus.progress}%`
+                      : ""}
                   </div>
                 </div>
               )}

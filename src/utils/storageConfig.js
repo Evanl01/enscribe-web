@@ -35,6 +35,12 @@ export const STORAGE_KEYS = {
   confirmEmail: {
     resendConfirmationCooldownTs: `${STORAGE_PREFIX}resendConfirmationCooldownTs`,
   },
+
+  // Job tracking (for async job operations)
+  jobs: {
+    promptLlmJobId: `${STORAGE_PREFIX}promptLlmJobId`,
+    promptLlmJobStatus: `${STORAGE_PREFIX}promptLlmJobStatus`,
+  },
 };
 
 /**

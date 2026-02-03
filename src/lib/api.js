@@ -975,3 +975,129 @@ export const xhrUploadToSignedUrl = async (signedUrl, file, onProgress) => {
   });
 };
 
+/**
+ * Job-based LLM Processing API Functions
+ * 
+ * Workflow:
+ * 1. createPromptLlmJob(recordingPath) → Get jobId
+ * 2. Poll getPromptLlmJobStatus(jobId) until complete/error
+ * 3. getPromptLlmJobResult(jobId) → Get full result with parsed SOAP note
+ */
+
+/**
+ * Create a new prompt LLM job
+ * @param {string} recordingPath - Path to recording file (backend derives signed URL)
+ * @returns {Promise<{id: string, status: string}>}
+ */
+export const createPromptLlmJob = async (recordingPath) => {
+  const jwt = getJWT();
+  if (!jwt) throw new Error('Not authenticated');
+
+  try {
+    const response = await fetch(`${API_BASE}/api/jobs/prompt-llm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${jwt}`,
+      },
+      body: JSON.stringify({
+        recording_file_path: recordingPath,
+      }),
+    });
+
+    if (response.status === 400) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Invalid job request: ${errorData.error || 'Missing recording_file_path'}`);
+    }
+
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Please log in again');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to create job: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('[createPromptLlmJob] Job created:', { jobId: data.id, status: data.status });
+    return data; // { id, status }
+  } catch (error) {
+    console.error('[createPromptLlmJob] Error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Poll job status (lightweight - status only, no transcript/result)
+ * @param {string} jobId - Job ID to poll
+ * @returns {Promise<{id: string, status: string, error_message?: string, transcript_text?: string}>}
+ */
+export const getPromptLlmJobStatus = async (jobId) => {
+  const jwt = getJWT();
+  if (!jwt) throw new Error('Not authenticated');
+
+  try {
+    const response = await fetch(`${API_BASE}/api/jobs/prompt-llm/${jobId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${jwt}`,
+      },
+    });
+
+    if (response.status === 404) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Job not found: ${errorData.error || jobId}`);
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const statusText = response.status === 500 ? 'Server error' : response.statusText;
+      throw new Error(errorData.error || `Failed to fetch job status: ${response.status} ${statusText}`);
+    }
+
+    const data = await response.json();
+    return data; // { id, status, transcript_text?, error_message? }
+  } catch (error) {
+    console.error('[getPromptLlmJobStatus] Error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get job result with parsed SOAP note (call when status === 'complete')
+ * @param {string} jobId - Job ID to fetch result for
+ * @returns {Promise<{id: string, status: string, transcript_text: string, soap_note: object, billing: object}>}
+ */
+export const getPromptLlmJobResult = async (jobId) => {
+  const jwt = getJWT();
+  if (!jwt) throw new Error('Not authenticated');
+
+  try {
+    const response = await fetch(`${API_BASE}/api/jobs/prompt-llm/${jobId}?includeResult=true`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${jwt}`,
+      },
+    });
+
+    if (response.status === 404) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Job not found: ${errorData.error || jobId}`);
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const statusText = response.status === 500 ? 'Server error' : response.statusText;
+      throw new Error(errorData.error || `Failed to fetch job result: ${response.status} ${statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('[getPromptLlmJobResult] Result fetched for job:', jobId);
+    return data; // { id, status, transcript_text, soap_note, billing }
+  } catch (error) {
+    console.error('[getPromptLlmJobResult] Error:', error);
+    throw error;
+  }
+};
+
