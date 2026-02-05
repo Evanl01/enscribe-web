@@ -1610,6 +1610,22 @@ export default function NewPatientEncounterPage() {
     }
   };
 
+  // Play notification (sound + vibration) when SOAP note processing completes
+  const notifyJobComplete = () => {
+    // Play notification sound
+    try {
+      const audio = new Audio('/sounds/tunetank.com_stop-process.wav');
+      audio.play().catch((error) => {
+        console.log("Could not play notification sound:", error);
+      });
+    } catch (error) {
+      console.log("Could not play notification sound:", error);
+    }
+    
+    // Vibrate
+    vibrate(300);
+  };
+
   // Generate SOAP note using job-based API
   const generateSoapNote = async () => {
     // Clear localStorage and reset textareas
@@ -1741,14 +1757,14 @@ export default function NewPatientEncounterPage() {
               await processJobResult(resultResponse);
               setIsProcessing(false);
               console.log(`[generateSoapNote] Poll #${pollCount} - SOAP note processing complete`);
-              vibrate(); // Terminal state: success
+              notifyJobComplete(); // Terminal state: success
               break;
             }
 
             // Handle error
             if (statusResponse.status === "error") {
               console.error(`[generateSoapNote] Poll #${pollCount} - Job error state received`);
-              vibrate(); // Terminal state: job error
+              notifyJobComplete(); // Terminal state: job error
               throw new Error(
                 statusResponse.error_message || "Job failed with unknown error",
               );
@@ -1839,11 +1855,11 @@ export default function NewPatientEncounterPage() {
         if (errorMsg.includes("expired token") || errorMsg.includes("401")) {
           api.handleSignOut();
           navigate("/login");
-          vibrate(); // Terminal state: auth error
+          notifyJobComplete(); // Terminal state: auth error
           return;
         }
 
-        vibrate(); // Terminal state: processing error
+        notifyJobComplete(); // Terminal state: processing error
         alert(`Error generating SOAP note: ${errorMsg}`);
         setCurrentStatus({
           status: "error",
@@ -1855,7 +1871,7 @@ export default function NewPatientEncounterPage() {
     } catch (error) {
       clearTimeout(timeoutId);
       console.error("[generateSoapNote] Outer error:", error);
-      vibrate(); // Terminal state: outer error (e.g., timeout)
+      notifyJobComplete(); // Terminal state: outer error (e.g., timeout)
       alert(`Error generating SOAP note: ${error.message}`);
       setCurrentStatus({
         status: "error",
