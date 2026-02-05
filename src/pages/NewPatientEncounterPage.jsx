@@ -1603,6 +1603,13 @@ export default function NewPatientEncounterPage() {
     };
   }, [isRecording]);
 
+  // Vibrate on phone (terminal state notification)
+  const vibrate = (duration = 200) => {
+    if (navigator?.vibrate) {
+      navigator.vibrate(duration);
+    }
+  };
+
   // Generate SOAP note using job-based API
   const generateSoapNote = async () => {
     // Clear localStorage and reset textareas
@@ -1734,12 +1741,14 @@ export default function NewPatientEncounterPage() {
               await processJobResult(resultResponse);
               setIsProcessing(false);
               console.log(`[generateSoapNote] Poll #${pollCount} - SOAP note processing complete`);
+              vibrate(); // Terminal state: success
               break;
             }
 
             // Handle error
             if (statusResponse.status === "error") {
               console.error(`[generateSoapNote] Poll #${pollCount} - Job error state received`);
+              vibrate(); // Terminal state: job error
               throw new Error(
                 statusResponse.error_message || "Job failed with unknown error",
               );
@@ -1830,9 +1839,11 @@ export default function NewPatientEncounterPage() {
         if (errorMsg.includes("expired token") || errorMsg.includes("401")) {
           api.handleSignOut();
           navigate("/login");
+          vibrate(); // Terminal state: auth error
           return;
         }
 
+        vibrate(); // Terminal state: processing error
         alert(`Error generating SOAP note: ${errorMsg}`);
         setCurrentStatus({
           status: "error",
@@ -1844,6 +1855,7 @@ export default function NewPatientEncounterPage() {
     } catch (error) {
       clearTimeout(timeoutId);
       console.error("[generateSoapNote] Outer error:", error);
+      vibrate(); // Terminal state: outer error (e.g., timeout)
       alert(`Error generating SOAP note: ${error.message}`);
       setCurrentStatus({
         status: "error",
