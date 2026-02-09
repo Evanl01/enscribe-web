@@ -1376,30 +1376,35 @@ export default function NewPatientEncounterPage() {
       errorMessage =
         "Failed to load audio file. It may be inaccessible or corrupted.\n\n Note: Safari does not support WebM format, try a different browser.";
       // Comprehensive fallback logging for mobile debugging
-      console.error(`[AudioPlayer FALLBACK] No error code found - full diagnostics:`, {
-        eventType: e?.type,
-        eventTarget: {
-          tagName: e?.target?.tagName,
-          src: e?.target?.src,
-          currentSrc: e?.target?.currentSrc,
-          networkState: e?.target?.networkState,
-          readyState: e?.target?.readyState,
-          buffered: e?.target?.buffered?.length,
-          paused: e?.target?.paused,
-          ended: e?.target?.ended,
-          seeking: e?.target?.seeking,
+      console.error(
+        `[AudioPlayer FALLBACK] No error code found - full diagnostics:`,
+        {
+          eventType: e?.type,
+          eventTarget: {
+            tagName: e?.target?.tagName,
+            src: e?.target?.src,
+            currentSrc: e?.target?.currentSrc,
+            networkState: e?.target?.networkState,
+            readyState: e?.target?.readyState,
+            buffered: e?.target?.buffered?.length,
+            paused: e?.target?.paused,
+            ended: e?.target?.ended,
+            seeking: e?.target?.seeking,
+          },
+          errorObject: e?.target?.error
+            ? {
+                code: e?.target?.error?.code,
+                message: e?.target?.error?.message,
+                name: e?.target?.error?.name,
+                keys: Object.keys(e?.target?.error || {}),
+              }
+            : "NULL - THIS IS THE PROBLEM",
+          allTargetKeys: Object.keys(e?.target || {}),
+          eventKeys: Object.keys(e || {}),
+          fullTarget: JSON.stringify(e?.target, null, 2).substring(0, 500),
+          fullEvent: JSON.stringify(e, null, 2).substring(0, 500),
         },
-        errorObject: e?.target?.error ? {
-          code: e?.target?.error?.code,
-          message: e?.target?.error?.message,
-          name: e?.target?.error?.name,
-          keys: Object.keys(e?.target?.error || {}),
-        } : 'NULL - THIS IS THE PROBLEM',
-        allTargetKeys: Object.keys(e?.target || {}),
-        eventKeys: Object.keys(e || {}),
-        fullTarget: JSON.stringify(e?.target, null, 2).substring(0, 500),
-        fullEvent: JSON.stringify(e, null, 2).substring(0, 500),
-      });
+      );
     }
     console.error(`[AudioPlayer Error] ${errorMessage}`, {
       errorCode: error?.code,
@@ -1614,14 +1619,14 @@ export default function NewPatientEncounterPage() {
   const notifyJobComplete = () => {
     // Play notification sound
     try {
-      const audio = new Audio('/sounds/tunetank.com_stop-process.wav');
+      const audio = new Audio("/sounds/tunetank.com_stop-process.wav");
       audio.play().catch((error) => {
         console.log("Could not play notification sound:", error);
       });
     } catch (error) {
       console.log("Could not play notification sound:", error);
     }
-    
+
     // Vibrate
     vibrate(300);
   };
@@ -1652,7 +1657,7 @@ export default function NewPatientEncounterPage() {
     const abortController = new AbortController();
     let timeoutId;
     const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
-    
+
     try {
       timeoutId = setTimeout(() => {
         abortController.abort();
@@ -1715,12 +1720,18 @@ export default function NewPatientEncounterPage() {
 
           try {
             pollCount++;
-            console.log(`[generateSoapNote] Poll #${pollCount} - Starting poll for jobId: ${jobId} - Next interval: ${pollInterval}ms`);
+            console.log(
+              `[generateSoapNote] Poll #${pollCount} - Starting poll for jobId: ${jobId} - Next interval: ${pollInterval}ms`,
+            );
             const statusResponse = await api.getPromptLlmJobStatus(jobId);
 
-            console.log(`[generateSoapNote] Poll #${pollCount} - Response received - Status: ${statusResponse.status}`);
+            console.log(
+              `[generateSoapNote] Poll #${pollCount} - Response received - Status: ${statusResponse.status}`,
+            );
             if (statusResponse.error_message) {
-              console.log(`[generateSoapNote] Poll #${pollCount} - Error message: ${statusResponse.error_message}`);
+              console.log(
+                `[generateSoapNote] Poll #${pollCount} - Error message: ${statusResponse.error_message}`,
+              );
             }
 
             localStorage.setItem(
@@ -1730,7 +1741,9 @@ export default function NewPatientEncounterPage() {
 
             // Reset backoff on successful poll
             if (consecutiveErrors > 0) {
-              console.log(`[generateSoapNote] Poll #${pollCount} - Resetting backoff (was ${consecutiveErrors} consecutive errors)`);
+              console.log(
+                `[generateSoapNote] Poll #${pollCount} - Resetting backoff (was ${consecutiveErrors} consecutive errors)`,
+              );
             }
             backoffMultiplier = 1;
             consecutiveErrors = 0;
@@ -1746,24 +1759,33 @@ export default function NewPatientEncounterPage() {
 
             setCurrentStatus({
               status: statusResponse.status,
-              message: statusMessage[statusResponse.status] || statusResponse.status,
+              message:
+                statusMessage[statusResponse.status] || statusResponse.status,
             });
 
             // Handle completion
             if (statusResponse.status === "complete") {
-              console.log(`[generateSoapNote] Poll #${pollCount} - Job complete! Fetching full result with ?includeResult=true`);
+              console.log(
+                `[generateSoapNote] Poll #${pollCount} - Job complete! Fetching full result with ?includeResult=true`,
+              );
               const resultResponse = await api.getPromptLlmJobResult(jobId);
-              console.log(`[generateSoapNote] Poll #${pollCount} - Result fetched successfully`);
+              console.log(
+                `[generateSoapNote] Poll #${pollCount} - Result fetched successfully`,
+              );
               await processJobResult(resultResponse);
               setIsProcessing(false);
-              console.log(`[generateSoapNote] Poll #${pollCount} - SOAP note processing complete`);
+              console.log(
+                `[generateSoapNote] Poll #${pollCount} - SOAP note processing complete`,
+              );
               notifyJobComplete(); // Terminal state: success
               break;
             }
 
             // Handle error
             if (statusResponse.status === "error") {
-              console.error(`[generateSoapNote] Poll #${pollCount} - Job error state received`);
+              console.error(
+                `[generateSoapNote] Poll #${pollCount} - Job error state received`,
+              );
               notifyJobComplete(); // Terminal state: job error
               throw new Error(
                 statusResponse.error_message || "Job failed with unknown error",
@@ -1771,51 +1793,73 @@ export default function NewPatientEncounterPage() {
             }
 
             // Wait before next poll (10 seconds default, or with backoff)
-            console.log(`[generateSoapNote] Poll #${pollCount} - Waiting ${pollInterval}ms before next poll (status: ${statusResponse.status})`);
+            console.log(
+              `[generateSoapNote] Poll #${pollCount} - Waiting ${pollInterval}ms before next poll (status: ${statusResponse.status})`,
+            );
             await new Promise((resolve) => {
               const pollTimeout = setTimeout(resolve, pollInterval);
-              abortController.signal.addEventListener(
-                "abort",
-                () => clearTimeout(pollTimeout),
+              abortController.signal.addEventListener("abort", () =>
+                clearTimeout(pollTimeout),
               );
             });
           } catch (pollError) {
             // Categorize error and handle accordingly
             const networkErr = isNetworkError(pollError);
-            const is401 = pollError.message?.includes('401') || pollError.message?.includes('Unauthorized');
-            const is404 = pollError.message?.includes('404') || pollError.message?.includes('not found');
-            const isJobError = pollError.message?.includes('Job') && pollError.message?.includes('failed');
+            const is401 =
+              pollError.message?.includes("401") ||
+              pollError.message?.includes("Unauthorized");
+            const is404 =
+              pollError.message?.includes("404") ||
+              pollError.message?.includes("not found");
+            const isJobError =
+              pollError.message?.includes("Job") &&
+              pollError.message?.includes("failed");
 
-            console.warn(`[generateSoapNote] Poll #${pollCount} - Error: ${pollError.message} (network=${networkErr}, 401=${is401}, 404=${is404}, jobError=${isJobError})`);
+            console.warn(
+              `[generateSoapNote] Poll #${pollCount} - Error: ${pollError.message} (network=${networkErr}, 401=${is401}, 404=${is404}, jobError=${isJobError})`,
+            );
 
             // 401 Unauthorized: Refresh JWT and retry immediately
             if (is401) {
-              console.log(`[generateSoapNote] Poll #${pollCount} - 401 Unauthorized: Attempting JWT refresh`);
+              console.log(
+                `[generateSoapNote] Poll #${pollCount} - 401 Unauthorized: Attempting JWT refresh`,
+              );
               try {
                 await api.refreshSession();
-                console.log(`[generateSoapNote] Poll #${pollCount} - JWT refreshed successfully, retrying immediately`);
+                console.log(
+                  `[generateSoapNote] Poll #${pollCount} - JWT refreshed successfully, retrying immediately`,
+                );
                 backoffMultiplier = 1;
                 consecutiveErrors = 0;
                 continue; // Retry immediately without backoff
               } catch (refreshError) {
-                console.error(`[generateSoapNote] Poll #${pollCount} - JWT refresh failed:`, refreshError);
-                throw new Error('Session expired. Please log in again.');
+                console.error(
+                  `[generateSoapNote] Poll #${pollCount} - JWT refresh failed:`,
+                  refreshError,
+                );
+                throw new Error("Session expired. Please log in again.");
               }
             }
 
             // 404 or job error: Stop immediately (non-retryable)
             if (is404 || isJobError) {
-              console.error(`[generateSoapNote] Poll #${pollCount} - Non-retryable error: ${pollError.message}`);
+              console.error(
+                `[generateSoapNote] Poll #${pollCount} - Non-retryable error: ${pollError.message}`,
+              );
               throw pollError;
             }
 
             // Network errors: Use exponential backoff with 10 retries for bad mobile connections
             if (networkErr) {
               consecutiveErrors++;
-              console.warn(`[generateSoapNote] Poll #${pollCount} - Network error (attempt #${consecutiveErrors}/10): ${pollError.message}`);
+              console.warn(
+                `[generateSoapNote] Poll #${pollCount} - Network error (attempt #${consecutiveErrors}/10): ${pollError.message}`,
+              );
 
               if (consecutiveErrors >= 10) {
-                console.error(`[generateSoapNote] Poll #${pollCount} - GIVING UP after ${consecutiveErrors} network errors`);
+                console.error(
+                  `[generateSoapNote] Poll #${pollCount} - GIVING UP after ${consecutiveErrors} network errors`,
+                );
                 throw new Error(
                   `Failed to reach server after ${consecutiveErrors} attempts. Please check your connection.`,
                 );
@@ -1828,21 +1872,26 @@ export default function NewPatientEncounterPage() {
                   MAX_BACKOFF / 10000,
                 );
                 pollInterval = 10000 * backoffMultiplier;
-                console.log(`[generateSoapNote] Poll #${pollCount} - Applying exponential backoff: multiplier=${backoffMultiplier}, nextInterval=${pollInterval}ms`);
+                console.log(
+                  `[generateSoapNote] Poll #${pollCount} - Applying exponential backoff: multiplier=${backoffMultiplier}, nextInterval=${pollInterval}ms`,
+                );
               }
 
               // Wait before retrying network error
-              console.log(`[generateSoapNote] Poll #${pollCount} - Waiting ${pollInterval}ms before network retry`);
+              console.log(
+                `[generateSoapNote] Poll #${pollCount} - Waiting ${pollInterval}ms before network retry`,
+              );
               await new Promise((resolve) => {
                 const pollTimeout = setTimeout(resolve, pollInterval);
-                abortController.signal.addEventListener(
-                  "abort",
-                  () => clearTimeout(pollTimeout),
+                abortController.signal.addEventListener("abort", () =>
+                  clearTimeout(pollTimeout),
                 );
               });
             } else {
               // Unknown error: Stop immediately
-              console.error(`[generateSoapNote] Poll #${pollCount} - Unknown error (non-retryable): ${pollError.message}`);
+              console.error(
+                `[generateSoapNote] Poll #${pollCount} - Unknown error (non-retryable): ${pollError.message}`,
+              );
               throw pollError;
             }
           }
@@ -1971,9 +2020,7 @@ export default function NewPatientEncounterPage() {
       setSoapAssessment("");
       setSoapPlan("");
       setBillingSuggestion("");
-      throw new Error(
-        `Failed to parse SOAP note result: ${e.message}`,
-      );
+      throw new Error(`Failed to parse SOAP note result: ${e.message}`);
     }
   };
 
@@ -2258,17 +2305,17 @@ export default function NewPatientEncounterPage() {
 
                   return (
                     <div
-                      className={`mt-6 p-4 rounded-lg border ${
+                      className={`mt-6 p-4 rounded-lg border w-full max-w-full overflow-hidden ${
                         isLoading
                           ? "bg-gray-100 border-gray-300 opacity-60 pointer-events-none select-none"
                           : "bg-green-50 border-green-200"
                       }`}
                     >
-                      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div className="flex-1">
+                      <div className="flex flex-col md:flex-row justify-between items-center gap-4 w-full">
+                        <div className="flex-1 min-w-0 w-full max-w-full ">
                           <p
-                            className={`font-medium ${
-                              isLoading ? "text-gray-500" : "text-green-800"
+                            className={`text-sm w-full break-words ${
+                              isLoading ? "text-gray-500" : "text-green-600"
                             }`}
                           >
                             {isLoading
@@ -2281,7 +2328,7 @@ export default function NewPatientEncounterPage() {
                           </p>
                           {isLoading &&
                             currentStatus?.progress !== undefined && (
-                              <p className="text-sm text-gray-600 mt-1">
+                              <p className="text-sm w-full break-words text-gray-600 mt-1">
                                 Progress: {currentStatus.progress}%
                               </p>
                             )}
@@ -2298,7 +2345,7 @@ export default function NewPatientEncounterPage() {
 
                           {/* Audio Player - Simple native player with download button */}
                           {!isLoading && recordingFileMetadata?.signedUrl && (
-                            <div className="mt-4">
+                            <div className="mt-4 w-full overflow-hidden">
                               <AudioPlayer
                                 src={recordingFileMetadata.signedUrl}
                                 onError={handleAudioError}

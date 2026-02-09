@@ -22,6 +22,7 @@ export default function PatientEncounterPreviewOverlay({
   errorMessage,
   sections = ["transcript", "soapNote", "billingSuggestion"], // default to all
   isPatientEncounterNameEditable=true,
+  mode = "save", // 'review' or 'save'
 }) {
   const [previewSection, setPreviewSection] = useState(sections[0]);
 
@@ -68,8 +69,14 @@ export default function PatientEncounterPreviewOverlay({
     soapPlan,
   ]);
 
-  // Handle preview navigation
+  // Handle navigation and save based on mode
   const handlePreviewNext = () => {
+    // In save mode, skip review tracking and go straight to save
+    if (mode === "save") {
+      onSave();
+      return;
+    }
+
     setReviewedSections((prev) => ({
       ...prev,
       [previewSection]: true,
@@ -95,6 +102,11 @@ export default function PatientEncounterPreviewOverlay({
   };
 
   const getNextButtonText = () => {
+    // In save mode, always show Save
+    if (mode === "save") {
+      return "Save";
+    }
+
     // If on billingSuggestion, and not all reviewed, go to next unreviewed
     if (previewSection === "billingSuggestion") {
       const unreviewed = menuSections.find((s) => !reviewedSections[s.key]);
@@ -278,11 +290,7 @@ export default function PatientEncounterPreviewOverlay({
               <button
                 onClick={handlePreviewNext}
                 disabled={isSaving}
-                className={`w-full px-6 py-3 rounded-lg font-medium ${
-                  previewSection === "billingSuggestion"
-                    ? "bg-green-600 hover:bg-green-700"
-                    : "bg-green-600 hover:bg-green-700"
-                } text-white ${
+                className={`w-full px-6 py-3 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white ${
                   isSaving ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               >

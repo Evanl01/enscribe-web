@@ -1,48 +1,58 @@
 import React from "react";
 import { saveAs } from "file-saver";
 
-export default function AudioPlayer({ 
-  src, 
-  onError, 
+export default function AudioPlayer({
+  src,
+  onError,
   filename = "recording.webm",
-  maxWidth = "100%"
+  maxWidth = "100%",
 }) {
   // Detect audio type from filename or URL
   const getAudioType = (url) => {
     if (!url) return "audio/mpeg";
-    const ext = url.toLowerCase().split('.').pop()?.split('?')[0] || '';
+    const ext = url.toLowerCase().split(".").pop()?.split("?")[0] || "";
     const typeMap = {
-      'mp3': 'audio/mpeg',
-      'wav': 'audio/wav',
-      'webm': 'audio/webm',
-      'ogg': 'audio/ogg',
-      'm4a': 'audio/mp4',
-      'mp4': 'audio/mp4'
+      mp3: "audio/mpeg",
+      wav: "audio/wav",
+      webm: "audio/webm",
+      ogg: "audio/ogg",
+      m4a: "audio/mp4",
+      mp4: "audio/mp4",
     };
-    return typeMap[ext] || 'audio/mpeg';
+    return typeMap[ext] || "audio/mpeg";
   };
 
   const audioType = getAudioType(src);
 
   return (
-    <div style={{ 
-      padding: "4px", 
-      backgroundColor: "#f3f4f6", 
-      borderRadius: "12px",
-      maxWidth: maxWidth
-    }}>
-      <div style={{ display: "flex", gap: "0px", alignItems: "center" }}>
-        <audio 
-          controls 
+    <div
+      style={{
+        padding: "4px",
+        width: "100%", // Add this
+        maxWidth: maxWidth, // Keep this
+        backgroundColor: "#f3f4f6",
+        borderRadius: "12px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          gap: "0px",
+          alignItems: "center",
+          width: "100%",
+        }}
+      >
+        <audio
+          controls
           controlsList="nodownload noplaybackrate"
-          style={{ flex: 1 }}
+          style={{ flex: 1, minWidth: 0 }}
           preload="metadata"
           onError={onError}
         >
           <source src={src} type={audioType} />
           Your browser does not support the audio element.
         </audio>
-        
+
         {/* Download Button with SVG */}
         <button
           onClick={async () => {
@@ -52,8 +62,8 @@ export default function AudioPlayer({
               const blob = await response.blob();
               saveAs(blob, filename);
             } catch (error) {
-              console.error('Error downloading recording:', error);
-              alert('Failed to download recording. Please try again.');
+              console.error("Error downloading recording:", error);
+              alert("Failed to download recording. Please try again.");
             }
           }}
           style={{
@@ -69,13 +79,21 @@ export default function AudioPlayer({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            transition: "background-color 0.2s"
+            transition: "background-color 0.2s",
           }}
-          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#e5e7eb")}
-          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+          onMouseOver={(e) =>
+            (e.currentTarget.style.backgroundColor = "#e5e7eb")
+          }
+          onMouseOut={(e) =>
+            (e.currentTarget.style.backgroundColor = "#f3f4f6")
+          }
           title="Download recording"
         >
-          <img src="/download-icon.svg" alt="Download" style={{ width: "18px", height: "18px" }} />
+          <img
+            src="/download-icon.svg"
+            alt="Download"
+            style={{ width: "18px", height: "18px" }}
+          />
         </button>
 
         {/* Spacer for right padding */}
